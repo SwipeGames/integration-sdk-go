@@ -20,21 +20,22 @@ go vet ./...      # lint
 ## Architecture
 
 ```
-swipegames/
-  config.go      - Environment, ClientConfig
-  client.go      - Core API client (outbound HTTP calls)
-  crypto.go      - HMAC-SHA256 signing, RFC 8785 JCS canonicalization
-  verify.go      - Inbound request signature verification + validation
-  responses.go   - Response builder helpers (NewBetResponse, etc.)
-  types.go       - Re-exported types from public-api + SDK-specific param structs
-  errors.go      - APIError, ValidationError
+config.go      - Environment, ClientConfig
+client.go      - Core API client (outbound HTTP calls)
+crypto.go      - HMAC-SHA256 signing, RFC 8785 JCS canonicalization
+verify.go      - Inbound request signature verification + validation
+responses.go   - Response builder helpers (NewBetResponse, etc.)
+types.go       - Re-exported types from public-api + SDK-specific param structs
+errors.go      - APIError, ValidationError, VerifyError
 ```
+
+All code is in `package swipegames` at the repo root. Users import as `swipegames "github.com/swipegames/integration-sdk-go"`.
 
 All types in `types.go` are aliases of `github.com/swipegames/public-api` generated types. SDK-specific structs (`CreateNewGameParams`, `CreateFreeRoundsParams`, etc.) are defined at the bottom of `types.go`.
 
 ## Key Design Decisions
 
-- **Single package**: no internal/, no sub-packages. Everything is `package swipegames`.
+- **Single package at root**: no internal/, no sub-packages. Everything is `package swipegames` at the repo root.
 - **Two API keys**: `APIKey` signs outbound Core API requests; `IntegrationAPIKey` verifies inbound reverse calls.
 - **Canonical JSON**: all request bodies are sent as RFC 8785 canonical JSON (sorted keys, no whitespace) to match the signed content exactly.
 - **Type aliases**: re-export public-api types so SDK users don't need to import public-api directly.

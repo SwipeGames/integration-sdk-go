@@ -36,7 +36,7 @@ The SDK uses two separate API keys:
 - **`IntegrationAPIKey`** — used to verify reverse calls **you receive** from the Swipe Games platform
 
 ```go
-import "github.com/swipegames/integration-sdk-go/swipegames"
+import swipegames "github.com/swipegames/integration-sdk-go"
 
 client, err := swipegames.NewClient(swipegames.ClientConfig{
 	CID:               "your-cid-uuid",   // Swipe Games-assigned Client ID (CID)
@@ -381,7 +381,7 @@ All request/response types are derived from the [`github.com/swipegames/public-a
 
 ```go
 // Via the SDK (recommended)
-import "github.com/swipegames/integration-sdk-go/swipegames"
+import swipegames "github.com/swipegames/integration-sdk-go"
 var user swipegames.User
 
 // Or directly from public-api
@@ -389,7 +389,7 @@ import apiv1 "github.com/swipegames/public-api/api/v1.0"
 var user apiv1.User
 ```
 
-See [`swipegames/types.go`](swipegames/types.go) for the full list of re-exported types and constants.
+See [`types.go`](types.go) for the full list of re-exported types and constants.
 
 ---
 
