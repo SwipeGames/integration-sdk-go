@@ -34,95 +34,68 @@ func (c *Client) VerifyBalanceRequest(queryParams map[string]string, signatureHe
 }
 
 // ParseAndVerifyBetRequest parses, verifies, and validates an incoming /bet request.
-func (c *Client) ParseAndVerifyBetRequest(rawBody string, signatureHeader string) ParsedRequestResult[BetRequest] {
+func (c *Client) ParseAndVerifyBetRequest(rawBody string, signatureHeader string) (BetRequest, *VerifyError) {
 	var body BetRequest
-	result := c.parseAndVerifyInboundRequest(rawBody, signatureHeader, &body)
-	if !result.OK {
-		return ParsedRequestResult[BetRequest]{OK: false, Error: result.Error}
+	if err := c.parseAndVerifyInboundRequest(rawBody, signatureHeader, &body); err != nil {
+		return BetRequest{}, err
 	}
 
 	// validate required fields
 	if body.Type == "" || body.SessionID == "" || body.Amount == "" || body.TxID == uuid.Nil || body.RoundID == uuid.Nil {
-		return ParsedRequestResult[BetRequest]{
-			OK:    false,
-			Error: &ErrorResponseWithCodeAndAction{Message: "Invalid request body"},
-		}
+		return BetRequest{}, newVerifyError("Invalid request body")
 	}
 	if !body.Type.Valid() {
-		return ParsedRequestResult[BetRequest]{
-			OK:    false,
-			Error: &ErrorResponseWithCodeAndAction{Message: "Invalid request body"},
-		}
+		return BetRequest{}, newVerifyError("Invalid request body")
 	}
 
-	return ParsedRequestResult[BetRequest]{OK: true, Body: body}
+	return body, nil
 }
 
 // ParseAndVerifyWinRequest parses, verifies, and validates an incoming /win request.
-func (c *Client) ParseAndVerifyWinRequest(rawBody string, signatureHeader string) ParsedRequestResult[WinRequest] {
+func (c *Client) ParseAndVerifyWinRequest(rawBody string, signatureHeader string) (WinRequest, *VerifyError) {
 	var body WinRequest
-	result := c.parseAndVerifyInboundRequest(rawBody, signatureHeader, &body)
-	if !result.OK {
-		return ParsedRequestResult[WinRequest]{OK: false, Error: result.Error}
+	if err := c.parseAndVerifyInboundRequest(rawBody, signatureHeader, &body); err != nil {
+		return WinRequest{}, err
 	}
 
 	// validate required fields
 	if body.Type == "" || body.SessionID == "" || body.Amount == "" || body.TxID == uuid.Nil || body.RoundID == uuid.Nil {
-		return ParsedRequestResult[WinRequest]{
-			OK:    false,
-			Error: &ErrorResponseWithCodeAndAction{Message: "Invalid request body"},
-		}
+		return WinRequest{}, newVerifyError("Invalid request body")
 	}
 	if !body.Type.Valid() {
-		return ParsedRequestResult[WinRequest]{
-			OK:    false,
-			Error: &ErrorResponseWithCodeAndAction{Message: "Invalid request body"},
-		}
+		return WinRequest{}, newVerifyError("Invalid request body")
 	}
 
-	return ParsedRequestResult[WinRequest]{OK: true, Body: body}
+	return body, nil
 }
 
 // ParseAndVerifyRefundRequest parses, verifies, and validates an incoming /refund request.
-func (c *Client) ParseAndVerifyRefundRequest(rawBody string, signatureHeader string) ParsedRequestResult[RefundRequest] {
+func (c *Client) ParseAndVerifyRefundRequest(rawBody string, signatureHeader string) (RefundRequest, *VerifyError) {
 	var body RefundRequest
-	result := c.parseAndVerifyInboundRequest(rawBody, signatureHeader, &body)
-	if !result.OK {
-		return ParsedRequestResult[RefundRequest]{OK: false, Error: result.Error}
+	if err := c.parseAndVerifyInboundRequest(rawBody, signatureHeader, &body); err != nil {
+		return RefundRequest{}, err
 	}
 
 	// validate required fields
 	if body.SessionID == "" || body.Amount == "" || body.TxID == uuid.Nil || body.OrigTxID == uuid.Nil {
-		return ParsedRequestResult[RefundRequest]{
-			OK:    false,
-			Error: &ErrorResponseWithCodeAndAction{Message: "Invalid request body"},
-		}
+		return RefundRequest{}, newVerifyError("Invalid request body")
 	}
 
-	return ParsedRequestResult[RefundRequest]{OK: true, Body: body}
+	return body, nil
 }
 
 // ParseAndVerifyBalanceRequest parses, verifies, and validates an incoming GET /balance request.
-func (c *Client) ParseAndVerifyBalanceRequest(queryParams map[string]string, signatureHeader string) ParsedBalanceResult {
+func (c *Client) ParseAndVerifyBalanceRequest(queryParams map[string]string, signatureHeader string) (*GetBalanceQuery, *VerifyError) {
 	if !c.VerifyBalanceRequest(queryParams, signatureHeader) {
-		return ParsedBalanceResult{
-			OK:    false,
-			Error: &ErrorResponseWithCodeAndAction{Message: "Invalid signature"},
-		}
+		return nil, newVerifyError("Invalid signature")
 	}
 
 	sessionID, ok := queryParams["sessionID"]
 	if !ok || sessionID == "" {
-		return ParsedBalanceResult{
-			OK:    false,
-			Error: &ErrorResponseWithCodeAndAction{Message: "Missing sessionID"},
-		}
+		return nil, newVerifyError("Missing sessionID")
 	}
 
-	return ParsedBalanceResult{
-		OK:    true,
-		Query: &GetBalanceQuery{SessionID: sessionID},
-	}
+	return &GetBalanceQuery{SessionID: sessionID}, nil
 }
 
 func (c *Client) verifyInboundSignature(body string, signatureHeader string) bool {
@@ -136,25 +109,14 @@ func (c *Client) verifyInboundSignature(body string, signatureHeader string) boo
 	return ok
 }
 
-type parseResult struct {
-	OK    bool
-	Error *ErrorResponseWithCodeAndAction
-}
-
-func (c *Client) parseAndVerifyInboundRequest(rawBody string, signatureHeader string, target any) parseResult {
+func (c *Client) parseAndVerifyInboundRequest(rawBody string, signatureHeader string, target any) *VerifyError {
 	if !c.verifyInboundSignature(rawBody, signatureHeader) {
-		return parseResult{
-			OK:    false,
-			Error: &ErrorResponseWithCodeAndAction{Message: "Invalid signature"},
-		}
+		return newVerifyError("Invalid signature")
 	}
 
 	if err := json.Unmarshal([]byte(rawBody), target); err != nil {
-		return parseResult{
-			OK:    false,
-			Error: &ErrorResponseWithCodeAndAction{Message: "Invalid request body"},
-		}
+		return newVerifyError("Invalid request body")
 	}
 
-	return parseResult{OK: true}
+	return nil
 }

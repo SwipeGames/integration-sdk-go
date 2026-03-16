@@ -180,16 +180,16 @@ func handleGetBalance(w http.ResponseWriter, r *http.Request) {
 	}
 	sig := r.Header.Get("X-REQUEST-SIGN")
 
-	result := client.ParseAndVerifyBalanceRequest(params, sig)
-	if !result.OK {
+	query, verifyErr := client.ParseAndVerifyBalanceRequest(params, sig)
+	if verifyErr != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(result.Error)
+		json.NewEncoder(w).Encode(verifyErr.Response())
 		return
 	}
 
 	// Your logic: look up the player's balance using the session ID.
-	balance := getPlayerBalance(result.Query.SessionID)
+	balance := getPlayerBalance(query.SessionID)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(swipegames.NewBalanceResponse(balance))
@@ -207,17 +207,17 @@ func handleBet(w http.ResponseWriter, r *http.Request) {
 	}
 	sig := r.Header.Get("X-REQUEST-SIGN")
 
-	result := client.ParseAndVerifyBetRequest(string(body), sig)
-	if !result.OK {
+	bet, verifyErr := client.ParseAndVerifyBetRequest(string(body), sig)
+	if verifyErr != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(result.Error)
+		json.NewEncoder(w).Encode(verifyErr.Response())
 		return
 	}
 
 	// Your logic: deduct the bet amount and record the transaction.
-	newBalance := deductFromWallet(result.Body.SessionID, result.Body.Amount)
-	partnerTxID := saveTransaction(result.Body.TxID, result.Body.RoundID)
+	newBalance := deductFromWallet(bet.SessionID, bet.Amount)
+	partnerTxID := saveTransaction(bet.TxID, bet.RoundID)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(swipegames.NewBetResponse(newBalance, partnerTxID))
@@ -235,17 +235,17 @@ func handleWin(w http.ResponseWriter, r *http.Request) {
 	}
 	sig := r.Header.Get("X-REQUEST-SIGN")
 
-	result := client.ParseAndVerifyWinRequest(string(body), sig)
-	if !result.OK {
+	win, verifyErr := client.ParseAndVerifyWinRequest(string(body), sig)
+	if verifyErr != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(result.Error)
+		json.NewEncoder(w).Encode(verifyErr.Response())
 		return
 	}
 
 	// Your logic: credit the win amount and record the transaction.
-	newBalance := creditToWallet(result.Body.SessionID, result.Body.Amount)
-	partnerTxID := saveTransaction(result.Body.TxID, result.Body.RoundID)
+	newBalance := creditToWallet(win.SessionID, win.Amount)
+	partnerTxID := saveTransaction(win.TxID, win.RoundID)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(swipegames.NewWinResponse(newBalance, partnerTxID))
@@ -263,21 +263,21 @@ func handleRefund(w http.ResponseWriter, r *http.Request) {
 	}
 	sig := r.Header.Get("X-REQUEST-SIGN")
 
-	result := client.ParseAndVerifyRefundRequest(string(body), sig)
-	if !result.OK {
+	refund, verifyErr := client.ParseAndVerifyRefundRequest(string(body), sig)
+	if verifyErr != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(result.Error)
+		json.NewEncoder(w).Encode(verifyErr.Response())
 		return
 	}
 
 	// Your logic: refund the original transaction and record the refund.
 	newBalance := refundToWallet(
-		result.Body.SessionID,
-		result.Body.OrigTxID,
-		result.Body.Amount,
+		refund.SessionID,
+		refund.OrigTxID,
+		refund.Amount,
 	)
-	partnerTxID := saveRefundTransaction(result.Body.TxID, result.Body.OrigTxID)
+	partnerTxID := saveRefundTransaction(refund.TxID, refund.OrigTxID)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(swipegames.NewRefundResponse(newBalance, partnerTxID))

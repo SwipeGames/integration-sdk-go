@@ -153,16 +153,3 @@ type GetBalanceQuery struct {
 	SessionID string `json:"sessionID"`
 }
 
-// ParsedRequestResult represents the result of parsing and verifying an inbound request.
-type ParsedRequestResult[T any] struct {
-	OK    bool                            `json:"ok"`
-	Body  T                               `json:"body,omitempty"`
-	Error *ErrorResponseWithCodeAndAction `json:"error,omitempty"`
-}
-
-// ParsedBalanceResult represents the result of parsing and verifying a balance request.
-type ParsedBalanceResult struct {
-	OK    bool                            `json:"ok"`
-	Query *GetBalanceQuery                `json:"query,omitempty"`
-	Error *ErrorResponseWithCodeAndAction `json:"error,omitempty"`
-}

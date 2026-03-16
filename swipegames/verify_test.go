@@ -121,7 +121,7 @@ func TestVerifyBalanceRequest(t *testing.T) {
 func TestParseAndVerifyBetRequest(t *testing.T) {
 	client := newTestClient()
 
-	t.Run("returns ok with typed body on valid signature", func(t *testing.T) {
+	t.Run("returns typed body on valid signature", func(t *testing.T) {
 		body := map[string]any{
 			"type": "regular", "sessionID": "s1", "amount": "10.00",
 			"txID": "550e8400-e29b-41d4-a716-446655440000", "roundID": "660e8400-e29b-41d4-a716-446655440000",
@@ -129,41 +129,41 @@ func TestParseAndVerifyBetRequest(t *testing.T) {
 		rawBody, _ := json.Marshal(body)
 		sig := signBody(string(rawBody))
 
-		result := client.ParseAndVerifyBetRequest(string(rawBody), sig)
-		if !result.OK {
-			t.Fatalf("expected ok, got error: %v", result.Error)
+		bet, err := client.ParseAndVerifyBetRequest(string(rawBody), sig)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
 		}
-		if result.Body.Type != BetRequestTypeRegular {
-			t.Errorf("type: got %s", result.Body.Type)
+		if bet.Type != BetRequestTypeRegular {
+			t.Errorf("type: got %s", bet.Type)
 		}
-		if result.Body.SessionID != "s1" {
-			t.Errorf("sessionID: got %s", result.Body.SessionID)
+		if bet.SessionID != "s1" {
+			t.Errorf("sessionID: got %s", bet.SessionID)
 		}
-		if result.Body.Amount != "10.00" {
-			t.Errorf("amount: got %s", result.Body.Amount)
+		if bet.Amount != "10.00" {
+			t.Errorf("amount: got %s", bet.Amount)
 		}
 	})
 
 	t.Run("rejects invalid signature", func(t *testing.T) {
-		result := client.ParseAndVerifyBetRequest(`{"sessionID":"s1"}`, "bad-sig")
-		if result.OK {
+		_, err := client.ParseAndVerifyBetRequest(`{"sessionID":"s1"}`, "bad-sig")
+		if err == nil {
 			t.Fatal("expected error")
 		}
-		if result.Error.Message != "Invalid signature" {
-			t.Errorf("message: got %s", result.Error.Message)
+		if err.Response().Message != "Invalid signature" {
+			t.Errorf("message: got %s", err.Response().Message)
 		}
 	})
 
 	t.Run("rejects missing signature", func(t *testing.T) {
-		result := client.ParseAndVerifyBetRequest(`{"sessionID":"s1"}`, "")
-		if result.OK {
+		_, err := client.ParseAndVerifyBetRequest(`{"sessionID":"s1"}`, "")
+		if err == nil {
 			t.Fatal("expected error")
 		}
 	})
 
 	t.Run("rejects invalid JSON body", func(t *testing.T) {
-		result := client.ParseAndVerifyBetRequest("not-json", "some-sig")
-		if result.OK {
+		_, err := client.ParseAndVerifyBetRequest("not-json", "some-sig")
+		if err == nil {
 			t.Fatal("expected error")
 		}
 	})
@@ -171,24 +171,24 @@ func TestParseAndVerifyBetRequest(t *testing.T) {
 	t.Run("rejects when body fails validation", func(t *testing.T) {
 		invalidBody := `{"type":"invalid_type","sessionID":"s1"}`
 		sig := signBody(invalidBody)
-		result := client.ParseAndVerifyBetRequest(invalidBody, sig)
-		if result.OK {
+		_, err := client.ParseAndVerifyBetRequest(invalidBody, sig)
+		if err == nil {
 			t.Fatal("expected error")
 		}
-		if result.Error.Message != "Invalid request body" {
-			t.Errorf("message: got %s", result.Error.Message)
+		if err.Response().Message != "Invalid request body" {
+			t.Errorf("message: got %s", err.Response().Message)
 		}
 	})
 
 	t.Run("rejects when missing txID and roundID", func(t *testing.T) {
 		body := `{"type":"regular","sessionID":"s1","amount":"10.00"}`
 		sig := signBody(body)
-		result := client.ParseAndVerifyBetRequest(body, sig)
-		if result.OK {
+		_, err := client.ParseAndVerifyBetRequest(body, sig)
+		if err == nil {
 			t.Fatal("expected error")
 		}
-		if result.Error.Message != "Invalid request body" {
-			t.Errorf("message: got %s", result.Error.Message)
+		if err.Response().Message != "Invalid request body" {
+			t.Errorf("message: got %s", err.Response().Message)
 		}
 	})
 }
@@ -196,7 +196,7 @@ func TestParseAndVerifyBetRequest(t *testing.T) {
 func TestParseAndVerifyWinRequest(t *testing.T) {
 	client := newTestClient()
 
-	t.Run("returns ok with typed body", func(t *testing.T) {
+	t.Run("returns typed body on valid signature", func(t *testing.T) {
 		body := map[string]any{
 			"type": "regular", "sessionID": "s1", "amount": "50.00",
 			"txID": "550e8400-e29b-41d4-a716-446655440002", "roundID": "660e8400-e29b-41d4-a716-446655440000",
@@ -204,48 +204,48 @@ func TestParseAndVerifyWinRequest(t *testing.T) {
 		rawBody, _ := json.Marshal(body)
 		sig := signBody(string(rawBody))
 
-		result := client.ParseAndVerifyWinRequest(string(rawBody), sig)
-		if !result.OK {
-			t.Fatalf("expected ok, got error: %v", result.Error)
+		win, err := client.ParseAndVerifyWinRequest(string(rawBody), sig)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
 		}
-		if result.Body.Amount != "50.00" {
-			t.Errorf("amount: got %s", result.Body.Amount)
+		if win.Amount != "50.00" {
+			t.Errorf("amount: got %s", win.Amount)
 		}
 	})
 
 	t.Run("rejects when missing required fields", func(t *testing.T) {
 		body := `{"type":"regular","sessionID":"s1"}`
 		sig := signBody(body)
-		result := client.ParseAndVerifyWinRequest(body, sig)
-		if result.OK {
+		_, err := client.ParseAndVerifyWinRequest(body, sig)
+		if err == nil {
 			t.Fatal("expected error")
 		}
-		if result.Error.Message != "Invalid request body" {
-			t.Errorf("message: got %s", result.Error.Message)
+		if err.Response().Message != "Invalid request body" {
+			t.Errorf("message: got %s", err.Response().Message)
 		}
 	})
 
 	t.Run("rejects invalid type", func(t *testing.T) {
 		body := `{"type":"invalid_type","sessionID":"s1","amount":"10.00","txID":"550e8400-e29b-41d4-a716-446655440002","roundID":"660e8400-e29b-41d4-a716-446655440000"}`
 		sig := signBody(body)
-		result := client.ParseAndVerifyWinRequest(body, sig)
-		if result.OK {
+		_, err := client.ParseAndVerifyWinRequest(body, sig)
+		if err == nil {
 			t.Fatal("expected error")
 		}
-		if result.Error.Message != "Invalid request body" {
-			t.Errorf("message: got %s", result.Error.Message)
+		if err.Response().Message != "Invalid request body" {
+			t.Errorf("message: got %s", err.Response().Message)
 		}
 	})
 
 	t.Run("rejects when missing txID and roundID", func(t *testing.T) {
 		body := `{"type":"regular","sessionID":"s1","amount":"50.00"}`
 		sig := signBody(body)
-		result := client.ParseAndVerifyWinRequest(body, sig)
-		if result.OK {
+		_, err := client.ParseAndVerifyWinRequest(body, sig)
+		if err == nil {
 			t.Fatal("expected error")
 		}
-		if result.Error.Message != "Invalid request body" {
-			t.Errorf("message: got %s", result.Error.Message)
+		if err.Response().Message != "Invalid request body" {
+			t.Errorf("message: got %s", err.Response().Message)
 		}
 	})
 }
@@ -253,7 +253,7 @@ func TestParseAndVerifyWinRequest(t *testing.T) {
 func TestParseAndVerifyRefundRequest(t *testing.T) {
 	client := newTestClient()
 
-	t.Run("returns ok with typed refund body", func(t *testing.T) {
+	t.Run("returns typed refund body on valid signature", func(t *testing.T) {
 		body := map[string]any{
 			"sessionID": "s1",
 			"txID":      "550e8400-e29b-41d4-a716-446655440001",
@@ -263,21 +263,24 @@ func TestParseAndVerifyRefundRequest(t *testing.T) {
 		rawBody, _ := json.Marshal(body)
 		sig := signBody(string(rawBody))
 
-		result := client.ParseAndVerifyRefundRequest(string(rawBody), sig)
-		if !result.OK {
-			t.Fatalf("expected ok, got error: %v", result.Error)
+		refund, err := client.ParseAndVerifyRefundRequest(string(rawBody), sig)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if refund.Amount != "10.00" {
+			t.Errorf("amount: got %s", refund.Amount)
 		}
 	})
 
 	t.Run("rejects when missing required fields", func(t *testing.T) {
 		body := `{"sessionID":"s1","amount":"10.00"}`
 		sig := signBody(body)
-		result := client.ParseAndVerifyRefundRequest(body, sig)
-		if result.OK {
+		_, err := client.ParseAndVerifyRefundRequest(body, sig)
+		if err == nil {
 			t.Fatal("expected error")
 		}
-		if result.Error.Message != "Invalid request body" {
-			t.Errorf("message: got %s", result.Error.Message)
+		if err.Response().Message != "Invalid request body" {
+			t.Errorf("message: got %s", err.Response().Message)
 		}
 	})
 }
@@ -285,29 +288,29 @@ func TestParseAndVerifyRefundRequest(t *testing.T) {
 func TestParseAndVerifyBalanceRequest(t *testing.T) {
 	client := newTestClient()
 
-	t.Run("returns ok with typed query on valid signature", func(t *testing.T) {
+	t.Run("returns typed query on valid signature", func(t *testing.T) {
 		params := map[string]string{"sessionID": "session-abc"}
 		sig := signQueryParams(params)
 
-		result := client.ParseAndVerifyBalanceRequest(params, sig)
-		if !result.OK {
-			t.Fatalf("expected ok, got error: %v", result.Error)
+		query, err := client.ParseAndVerifyBalanceRequest(params, sig)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
 		}
-		if result.Query.SessionID != "session-abc" {
-			t.Errorf("sessionID: got %s", result.Query.SessionID)
+		if query.SessionID != "session-abc" {
+			t.Errorf("sessionID: got %s", query.SessionID)
 		}
 	})
 
 	t.Run("rejects invalid signature", func(t *testing.T) {
-		result := client.ParseAndVerifyBalanceRequest(map[string]string{"sessionID": "s1"}, "bad-sig")
-		if result.OK {
+		_, err := client.ParseAndVerifyBalanceRequest(map[string]string{"sessionID": "s1"}, "bad-sig")
+		if err == nil {
 			t.Fatal("expected error")
 		}
 	})
 
 	t.Run("rejects missing signature", func(t *testing.T) {
-		result := client.ParseAndVerifyBalanceRequest(map[string]string{"sessionID": "s1"}, "")
-		if result.OK {
+		_, err := client.ParseAndVerifyBalanceRequest(map[string]string{"sessionID": "s1"}, "")
+		if err == nil {
 			t.Fatal("expected error")
 		}
 	})
@@ -316,12 +319,12 @@ func TestParseAndVerifyBalanceRequest(t *testing.T) {
 		params := map[string]string{"other": "value"}
 		sig := signQueryParams(params)
 
-		result := client.ParseAndVerifyBalanceRequest(params, sig)
-		if result.OK {
+		_, err := client.ParseAndVerifyBalanceRequest(params, sig)
+		if err == nil {
 			t.Fatal("expected error")
 		}
-		if result.Error.Message != "Missing sessionID" {
-			t.Errorf("message: got %s", result.Error.Message)
+		if err.Response().Message != "Missing sessionID" {
+			t.Errorf("message: got %s", err.Response().Message)
 		}
 	})
 }

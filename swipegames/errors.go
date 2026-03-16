@@ -29,3 +29,22 @@ func (e *ValidationError) Error() string {
 	}
 	return fmt.Sprintf("SwipeGamesValidationError: %s", e.Message)
 }
+
+// VerifyError is returned when an inbound request fails signature verification or validation.
+// use Response() to get the JSON-serializable error response for the platform.
+type VerifyError struct {
+	response ErrorResponseWithCodeAndAction
+}
+
+func (e *VerifyError) Error() string {
+	return fmt.Sprintf("SwipeGamesVerifyError: %s", e.response.Message)
+}
+
+// Response returns the structured error response suitable for JSON encoding back to the platform.
+func (e *VerifyError) Response() ErrorResponseWithCodeAndAction {
+	return e.response
+}
+
+func newVerifyError(message string) *VerifyError {
+	return &VerifyError{response: ErrorResponseWithCodeAndAction{Message: message}}
+}
