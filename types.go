@@ -1,23 +1,17 @@
 package swipegames
 
 import (
-	apiv1 "github.com/swipegames/public-api/api/v1.0"
-	coreapiv1 "github.com/swipegames/public-api/api/v1.0/core"
-	integrationapiv1 "github.com/swipegames/public-api/api/v1.0/swipegames-integration"
+	coreapiv1 "github.com/swipegames/public-api/api/v1.0/core/types"
+	integrationapiv1 "github.com/swipegames/public-api/api/v1.0/swipegames-integration/types"
 )
 
-// ── Re-exported types from public-api (common) ──
+// ── Re-exported types from public-api (core) ──
 
 // User represents a player.
-type User = apiv1.User
+type User = coreapiv1.User
 
-// ErrorResponseCode is the error code enum.
-type ErrorResponseCode = apiv1.ErrorResponseCode
-
-// ErrorResponse is the general error response.
-type ErrorResponse = apiv1.ErrorResponse
-
-// ── Re-exported types from public-api (core) ──
+// ErrorResponse is the core API error response.
+type ErrorResponse = coreapiv1.ErrorResponse
 
 // PlatformType is the game platform (desktop/mobile).
 type PlatformType = coreapiv1.PlatformType
@@ -152,4 +146,3 @@ type CancelFreeRoundsParams struct {
 type GetBalanceQuery struct {
 	SessionID string `json:"sessionID"`
 }
-

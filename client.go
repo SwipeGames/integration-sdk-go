@@ -66,13 +66,13 @@ func NewClient(config ClientConfig) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) log(format string, args ...any) {
+func (c *Client) log(format string, args ...interface{}) {
 	if c.debug {
 		log.Printf(fmt.Sprintf("[SwipeGamesSDK] %s", format), args...)
 	}
 }
 
-func (c *Client) logError(format string, args ...any) {
+func (c *Client) logError(format string, args ...interface{}) {
 	if c.debug {
 		log.Printf(fmt.Sprintf("[SwipeGamesSDK] ERROR: %s", format), args...)
 	}
@@ -120,7 +120,7 @@ func (c *Client) CancelFreeRounds(ctx context.Context, params CancelFreeRoundsPa
 		return &ValidationError{Message: "One of id or extID must be provided"}
 	}
 
-	body := map[string]any{
+	body := map[string]interface{}{
 		"cID":    c.cid,
 		"extCID": c.extCID,
 	}
@@ -134,8 +134,8 @@ func (c *Client) CancelFreeRounds(ctx context.Context, params CancelFreeRoundsPa
 	return c.doDelete(ctx, "/free-rounds", body)
 }
 
-func (c *Client) buildCreateNewGameBody(params CreateNewGameParams) map[string]any {
-	body := map[string]any{
+func (c *Client) buildCreateNewGameBody(params CreateNewGameParams) map[string]interface{} {
+	body := map[string]interface{}{
 		"cID":      c.cid,
 		"extCID":   c.extCID,
 		"gameID":   params.GameID,
@@ -162,8 +162,8 @@ func (c *Client) buildCreateNewGameBody(params CreateNewGameParams) map[string]a
 	return body
 }
 
-func (c *Client) buildCreateFreeRoundsBody(params CreateFreeRoundsParams) map[string]any {
-	body := map[string]any{
+func (c *Client) buildCreateFreeRoundsBody(params CreateFreeRoundsParams) map[string]interface{} {
+	body := map[string]interface{}{
 		"cID":       c.cid,
 		"extCID":    c.extCID,
 		"extID":     params.ExtID,
@@ -184,7 +184,7 @@ func (c *Client) buildCreateFreeRoundsBody(params CreateFreeRoundsParams) map[st
 	return body
 }
 
-func (c *Client) doPost(ctx context.Context, path string, body map[string]any, result any) error {
+func (c *Client) doPost(ctx context.Context, path string, body map[string]interface{}, result interface{}) error {
 	resp, err := c.doRequest(ctx, http.MethodPost, path, body)
 	if err != nil {
 		return err
@@ -197,7 +197,7 @@ func (c *Client) doPost(ctx context.Context, path string, body map[string]any, r
 	return json.NewDecoder(resp.Body).Decode(result)
 }
 
-func (c *Client) doGet(ctx context.Context, path string, queryParams map[string]string, result any) error {
+func (c *Client) doGet(ctx context.Context, path string, queryParams map[string]string, result interface{}) error {
 	u, err := url.Parse(c.baseURL + path)
 	if err != nil {
 		return fmt.Errorf("failed to parse URL: %w", err)
@@ -241,7 +241,7 @@ func (c *Client) doGet(ctx context.Context, path string, queryParams map[string]
 	return json.NewDecoder(resp.Body).Decode(result)
 }
 
-func (c *Client) doDelete(ctx context.Context, path string, body map[string]any) error {
+func (c *Client) doDelete(ctx context.Context, path string, body map[string]interface{}) error {
 	resp, err := c.doRequest(ctx, http.MethodDelete, path, body)
 	if err != nil {
 		return err
@@ -253,7 +253,7 @@ func (c *Client) doDelete(ctx context.Context, path string, body map[string]any)
 	return nil
 }
 
-func (c *Client) doRequest(ctx context.Context, method, path string, body map[string]any) (*http.Response, error) {
+func (c *Client) doRequest(ctx context.Context, method, path string, body map[string]interface{}) (*http.Response, error) {
 	fullURL := c.baseURL + path
 
 	canonical, err := canonicalizeJSON(body)
@@ -303,9 +303,6 @@ func (c *Client) parseAPIError(resp *http.Response, label string) error {
 	apiErr := &APIError{
 		StatusCode: resp.StatusCode,
 		Message:    errBody.Message,
-	}
-	if errBody.Code != nil {
-		apiErr.Code = string(*errBody.Code)
 	}
 	if errBody.Details != nil {
 		apiErr.Details = *errBody.Details

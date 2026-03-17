@@ -5,7 +5,7 @@ import "testing"
 func TestCreateSignature(t *testing.T) {
 	tests := []struct {
 		name     string
-		data     any
+		data     interface{}
 		apiKey   string
 		expected string
 	}{
@@ -47,7 +47,7 @@ func TestCreateSignature(t *testing.T) {
 		},
 		{
 			name:     "accepts map input (not just string)",
-			data:     map[string]any{"user_id": float64(123), "amount": 100.5},
+			data:     map[string]interface{}{"user_id": float64(123), "amount": 100.5},
 			apiKey:   "secret-key",
 			expected: "9876ed3affd6596f3ddb9102a396718452cf83069904f3d001a2e91e164adc01",
 		},

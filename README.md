@@ -6,7 +6,7 @@ For full API details, see the [Swipe Games Public API documentation](https://swi
 
 ## Requirements
 
-- Go 1.22+
+- Go 1.13+
 
 ## Installation
 
@@ -385,8 +385,8 @@ import swipegames "github.com/swipegames/integration-sdk-go"
 var user swipegames.User
 
 // Or directly from public-api
-import apiv1 "github.com/swipegames/public-api/api/v1.0"
-var user apiv1.User
+import commonv1 "github.com/swipegames/public-api/api/v1.0/common"
+var user commonv1.User
 ```
 
 See [`types.go`](types.go) for the full list of re-exported types and constants.

@@ -60,7 +60,7 @@ func TestVerifyBetRequest(t *testing.T) {
 	})
 
 	t.Run("returns false for wrong key", func(t *testing.T) {
-		body, _ := json.Marshal(map[string]any{"test": true})
+		body, _ := json.Marshal(map[string]interface{}{"test": true})
 		sig, _ := createSignatureFromString(string(body), "wrong-key")
 		if client.VerifyBetRequest(string(body), sig) {
 			t.Error("expected false")
@@ -122,7 +122,7 @@ func TestParseAndVerifyBetRequest(t *testing.T) {
 	client := newTestClient()
 
 	t.Run("returns typed body on valid signature", func(t *testing.T) {
-		body := map[string]any{
+		body := map[string]interface{}{
 			"type": "regular", "sessionID": "s1", "amount": "10.00",
 			"txID": "550e8400-e29b-41d4-a716-446655440000", "roundID": "660e8400-e29b-41d4-a716-446655440000",
 		}
@@ -197,7 +197,7 @@ func TestParseAndVerifyWinRequest(t *testing.T) {
 	client := newTestClient()
 
 	t.Run("returns typed body on valid signature", func(t *testing.T) {
-		body := map[string]any{
+		body := map[string]interface{}{
 			"type": "regular", "sessionID": "s1", "amount": "50.00",
 			"txID": "550e8400-e29b-41d4-a716-446655440002", "roundID": "660e8400-e29b-41d4-a716-446655440000",
 		}
@@ -254,7 +254,7 @@ func TestParseAndVerifyRefundRequest(t *testing.T) {
 	client := newTestClient()
 
 	t.Run("returns typed refund body on valid signature", func(t *testing.T) {
-		body := map[string]any{
+		body := map[string]interface{}{
 			"sessionID": "s1",
 			"txID":      "550e8400-e29b-41d4-a716-446655440001",
 			"origTxID":  "550e8400-e29b-41d4-a716-446655440000",

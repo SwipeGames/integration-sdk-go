@@ -141,7 +141,7 @@ func TestCreateNewGame(t *testing.T) {
 				t.Errorf("missing X-REQUEST-SIGN header")
 			}
 
-			var body map[string]any
+			var body map[string]interface{}
 			json.NewDecoder(r.Body).Decode(&body)
 			if body["cID"] != testConfig.CID {
 				t.Errorf("cID: got %v, want %s", body["cID"], testConfig.CID)
@@ -185,7 +185,7 @@ func TestCreateNewGame(t *testing.T) {
 
 	t.Run("includes optional fields in body when provided", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			var body map[string]any
+			var body map[string]interface{}
 			json.NewDecoder(r.Body).Decode(&body)
 			if body["returnURL"] != "https://return.url" {
 				t.Errorf("returnURL: got %v", body["returnURL"])
@@ -226,7 +226,6 @@ func TestCreateNewGame(t *testing.T) {
 			w.WriteHeader(401)
 			json.NewEncoder(w).Encode(map[string]string{
 				"message": "Invalid signature",
-				"code":    "session_expired",
 				"details": "Token expired at 12:00",
 			})
 		}))
@@ -253,9 +252,6 @@ func TestCreateNewGame(t *testing.T) {
 		}
 		if apiErr.Message != "Invalid signature" {
 			t.Errorf("message: got %s", apiErr.Message)
-		}
-		if apiErr.Code != "session_expired" {
-			t.Errorf("code: got %s", apiErr.Code)
 		}
 		if apiErr.Details != "Token expired at 12:00" {
 			t.Errorf("details: got %s", apiErr.Details)
@@ -348,7 +344,7 @@ func TestCreateFreeRounds(t *testing.T) {
 				t.Errorf("expected POST, got %s", r.Method)
 			}
 
-			var body map[string]any
+			var body map[string]interface{}
 			json.NewDecoder(r.Body).Decode(&body)
 			if body["cID"] != testConfig.CID {
 				t.Errorf("cID: got %v", body["cID"])
@@ -400,7 +396,7 @@ func TestCancelFreeRounds(t *testing.T) {
 				t.Errorf("expected DELETE, got %s", r.Method)
 			}
 
-			var body map[string]any
+			var body map[string]interface{}
 			json.NewDecoder(r.Body).Decode(&body)
 			if body["cID"] != testConfig.CID {
 				t.Errorf("cID: got %v", body["cID"])

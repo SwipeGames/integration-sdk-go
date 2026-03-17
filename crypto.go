@@ -15,8 +15,8 @@ import (
 
 // canonicalizeJSON implements RFC 8785 JSON Canonicalization Scheme.
 // It produces a deterministic JSON string with sorted keys and no extra whitespace.
-func canonicalizeJSON(data any) (string, error) {
-	var obj any
+func canonicalizeJSON(data interface{}) (string, error) {
+	var obj interface{}
 
 	switch v := data.(type) {
 	case string:
@@ -41,7 +41,7 @@ func canonicalizeJSON(data any) (string, error) {
 	return serializeCanonical(obj)
 }
 
-func serializeCanonical(v any) (string, error) {
+func serializeCanonical(v interface{}) (string, error) {
 	switch val := v.(type) {
 	case nil:
 		return "null", nil
@@ -58,7 +58,7 @@ func serializeCanonical(v any) (string, error) {
 			return "", err
 		}
 		return string(b), nil
-	case []any:
+	case []interface{}:
 		var parts []string
 		for _, item := range val {
 			s, err := serializeCanonical(item)
@@ -68,7 +68,7 @@ func serializeCanonical(v any) (string, error) {
 			parts = append(parts, s)
 		}
 		return fmt.Sprintf("[%s]", strings.Join(parts, ",")), nil
-	case map[string]any:
+	case map[string]interface{}:
 		keys := make([]string, 0, len(val))
 		for k := range val {
 			keys = append(keys, k)
@@ -143,7 +143,7 @@ func createSignatureFromCanonical(canonical string, apiKey string) (string, erro
 }
 
 // createSignature creates an HMAC-SHA256 signature using JCS canonicalization.
-func createSignature(data any, apiKey string) (string, error) {
+func createSignature(data interface{}, apiKey string) (string, error) {
 	canonical, err := canonicalizeJSON(data)
 	if err != nil {
 		return "", fmt.Errorf("failed to canonicalize: %w", err)
@@ -159,7 +159,7 @@ func createSignatureFromString(jsonStr string, apiKey string) (string, error) {
 // createQueryParamsSignature creates an HMAC-SHA256 signature from query parameters.
 func createQueryParamsSignature(params map[string]string, apiKey string) (string, error) {
 	// convert to map[string]interface{} for canonicalization
-	obj := make(map[string]any, len(params))
+	obj := make(map[string]interface{}, len(params))
 	for k, v := range params {
 		obj[k] = v
 	}
@@ -167,7 +167,7 @@ func createQueryParamsSignature(params map[string]string, apiKey string) (string
 }
 
 // verifySignature verifies an HMAC-SHA256 signature using timing-safe comparison.
-func verifySignature(data any, signature, apiKey string) (bool, error) {
+func verifySignature(data interface{}, signature, apiKey string) (bool, error) {
 	expected, err := createSignature(data, apiKey)
 	if err != nil {
 		return false, err

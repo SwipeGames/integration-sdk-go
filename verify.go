@@ -109,7 +109,7 @@ func (c *Client) verifyInboundSignature(body string, signatureHeader string) boo
 	return ok
 }
 
-func (c *Client) parseAndVerifyInboundRequest(rawBody string, signatureHeader string, target any) *VerifyError {
+func (c *Client) parseAndVerifyInboundRequest(rawBody string, signatureHeader string, target interface{}) *VerifyError {
 	if !c.verifyInboundSignature(rawBody, signatureHeader) {
 		return newVerifyError("Invalid signature")
 	}
