@@ -1,0 +1,318 @@
+name: Auto-update SDK
+
+on:
+  workflow_dispatch:
+    inputs:
+      public_api_version:
+        description: "Target public-api version (default: latest tag from repo)"
+        required: false
+        type: string
+        default: ""
+      auto_merge:
+        description: "Auto-merge PR if tests pass"
+        type: boolean
+        default: false
+      auto_release:
+        description: "Auto-create release after merge (implies auto_merge)"
+        type: boolean
+        default: false
+
+jobs:
+  update:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+    outputs:
+      pr_url: ${{ steps.create-pr.outputs.pr_url }}
+      tests_passed: ${{ steps.final-tests.outputs.passed }}
+      target_version: ${{ steps.versions.outputs.target }}
+
+    steps:
+      - name: Generate a token
+        id: generate-token
+        uses: getsentry/action-github-app-token@d4b5da6c5e37703f8c3b3e43abb5705b46e159cc
+        with:
+          app_id: ${{ secrets.APP_ID }}
+          private_key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Checkout SDK repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ steps.generate-token.outputs.token }}
+
+      - name: Checkout public-api repo
+        uses: actions/checkout@v4
+        with:
+          repository: SwipeGames/public-api
+          path: public-api
+          fetch-depth: 0
+          token: ${{ steps.generate-token.outputs.token }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Detect versions
+        id: versions
+        run: |
+          CURRENT=$(grep 'github.com/swipegames/public-api/api/v1.0/core/types' go.mod | awk '{print $2}' | sed 's/^v//')
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+
+          if [ -n "${{ inputs.public_api_version }}" ]; then
+            TARGET="${{ inputs.public_api_version }}"
+          else
+            TARGET=$(cd public-api && git describe --tags --abbrev=0 | sed 's/^v//')
+          fi
+          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
+
+          echo "Current version: $CURRENT"
+          echo "Target version:  $TARGET"
+
+          if [ "$CURRENT" = "$TARGET" ]; then
+            echo "Already up to date — nothing to do."
+            echo "up_to_date=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "up_to_date=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check for existing branch
+        if: steps.versions.outputs.up_to_date == 'false'
+        id: check-branch
+        run: |
+          TARGET="${{ steps.versions.outputs.target }}"
+          BRANCH="auto-update/public-api-v${TARGET}"
+          if git ls-remote --exit-code origin "refs/heads/${BRANCH}" > /dev/null 2>&1; then
+            echo "Branch ${BRANCH} already exists — skipping."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate public-api diff
+        if: steps.versions.outputs.up_to_date == 'false' && steps.check-branch.outputs.exists == 'false'
+        run: |
+          CURRENT="${{ steps.versions.outputs.current }}"
+          TARGET="${{ steps.versions.outputs.target }}"
+
+          cd public-api
+
+          # Generate diff between versions (exclude Node code, lock files, and generated schema docs)
+          git diff "v${CURRENT}..v${TARGET}" -- api/ docs/ \
+            ':!**/package-lock.json' ':!**/node_modules' ':!**/*.ts' ':!**/*.js' \
+            ':!**/schemas/*.schema.mdx' \
+            > /tmp/public-api-diff.txt 2>/dev/null || true
+
+          # Extract changelog excerpt if available
+          if [ -f docs/changes-log.md ]; then
+            cp docs/changes-log.md /tmp/public-api-changelog.md
+          fi
+
+          cd ..
+          echo "Diff size: $(wc -c < /tmp/public-api-diff.txt) bytes"
+
+      - name: Create branch
+        if: steps.versions.outputs.up_to_date == 'false' && steps.check-branch.outputs.exists == 'false'
+        run: |
+          TARGET="${{ steps.versions.outputs.target }}"
+          git checkout -b "auto-update/public-api-v${TARGET}"
+
+      - name: Update dependencies
+        if: steps.versions.outputs.up_to_date == 'false' && steps.check-branch.outputs.exists == 'false'
+        run: |
+          TARGET="${{ steps.versions.outputs.target }}"
+          go get "github.com/swipegames/public-api/api/v1.0/core/types@v${TARGET}"
+          go get "github.com/swipegames/public-api/api/v1.0/swipegames-integration/types@v${TARGET}"
+          go mod tidy
+
+      - name: Run initial tests
+        if: steps.versions.outputs.up_to_date == 'false' && steps.check-branch.outputs.exists == 'false'
+        id: initial-tests
+        continue-on-error: true
+        run: |
+          go test ./... && go vet ./...
+          echo "passed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Run Claude Code for SDK update
+        if: steps.versions.outputs.up_to_date == 'false' && steps.check-branch.outputs.exists == 'false'
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        env:
+          AWS_BEARER_TOKEN_BEDROCK: ${{ secrets.BEDROCK_API_KEY }}
+          AWS_REGION: ${{ secrets.BEDROCK_REGION }}
+          CLAUDE_CODE_ATTRIBUTION_HEADER: "0"
+        with:
+          use_bedrock: "true"
+          prompt: |
+            Read the prompt file at .github/prompts/auto-update.md and follow its instructions.
+
+            Environment context:
+            - PUBLIC_API_DIFF_FILE: /tmp/public-api-diff.txt
+            - PUBLIC_API_REPO_PATH: ${{ github.workspace }}/public-api
+            - CURRENT_VERSION: ${{ steps.versions.outputs.current }}
+            - TARGET_VERSION: ${{ steps.versions.outputs.target }}
+
+            Initial tests passed: ${{ steps.initial-tests.outputs.passed || 'false' }}
+
+            IMPORTANT: After making all changes, run `go test ./...` and `go vet ./...` to verify everything works. Fix any failures before finishing.
+          direct_prompt: true
+          claude_args: '--model global.anthropic.claude-opus-4-6-v1 --max-turns 30 --allowedTools "Bash,Read,Write,Edit,MultiEdit,Glob,Grep"'
+          timeout_minutes: "30"
+
+      - name: Run final tests
+        if: steps.versions.outputs.up_to_date == 'false' && steps.check-branch.outputs.exists == 'false'
+        id: final-tests
+        continue-on-error: true
+        run: |
+          go test ./... && go vet ./... && go build ./...
+          if [ $? -eq 0 ]; then
+            echo "passed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "passed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push
+        if: steps.versions.outputs.up_to_date == 'false' && steps.check-branch.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+        run: |
+          TARGET="${{ steps.versions.outputs.target }}"
+          BRANCH="auto-update/public-api-v${TARGET}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Stage all changes except the public-api checkout
+          git add -A ':!public-api'
+          git diff --cached --quiet && { echo "No changes to commit"; exit 0; }
+
+          git commit -m "build(update): update swipegames/public-api to v${TARGET}"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          git push origin "${BRANCH}"
+
+      - name: Create PR
+        if: steps.versions.outputs.up_to_date == 'false' && steps.check-branch.outputs.exists == 'false'
+        id: create-pr
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+        run: |
+          TARGET="${{ steps.versions.outputs.target }}"
+          CURRENT="${{ steps.versions.outputs.current }}"
+          TESTS_PASSED="${{ steps.final-tests.outputs.passed }}"
+
+          if [ "$TESTS_PASSED" = "true" ]; then
+            LABEL="auto-update:passing"
+          else
+            LABEL="auto-update:needs-review"
+          fi
+
+          # Ensure labels exist
+          gh label create "auto-update:passing" --color "0E8A16" --description "Auto-update PR with passing tests" 2>/dev/null || true
+          gh label create "auto-update:needs-review" --color "D93F0B" --description "Auto-update PR that needs manual review" 2>/dev/null || true
+
+          # Build PR body
+          BODY="## Summary
+
+          Updates \`swipegames/public-api\` from \`v${CURRENT}\` to \`v${TARGET}\`.
+
+          **Tests:** $([ "$TESTS_PASSED" = "true" ] && echo "✅ Passing" || echo "❌ Failing — manual review required")
+
+          ## Changes
+
+          This PR was automatically generated by the auto-update workflow using Claude Code to adapt the SDK to the new public-api version.
+
+          🤖 Generated with [Claude Code](https://claude.ai/code)"
+
+          PR_URL=$(gh pr create \
+            --title "build(update): update swipegames/public-api to v${TARGET}" \
+            --body "$BODY" \
+            --label "$LABEL" \
+            --base main)
+
+          echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+          echo "Created PR: $PR_URL"
+
+      - name: Enable auto-merge
+        if: >-
+          steps.versions.outputs.up_to_date == 'false' &&
+          steps.check-branch.outputs.exists == 'false' &&
+          steps.final-tests.outputs.passed == 'true' &&
+          (inputs.auto_merge || inputs.auto_release)
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+        run: |
+          gh pr merge "${{ steps.create-pr.outputs.pr_url }}" --auto --squash
+
+      - name: Slack notification
+        if: always() && steps.versions.outputs.up_to_date == 'false' && steps.check-branch.outputs.exists == 'false' && env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          TARGET="${{ steps.versions.outputs.target }}"
+          TESTS_PASSED="${{ steps.final-tests.outputs.passed }}"
+          PR_URL="${{ steps.create-pr.outputs.pr_url }}"
+          STATUS=$([ "$TESTS_PASSED" = "true" ] && echo "✅ Tests passing" || echo "❌ Tests failing")
+
+          curl -s -X POST "$SLACK_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"text\":\"Go SDK auto-update to public-api v${TARGET}: ${STATUS}\\n${PR_URL}\"}"
+
+  release:
+    needs: update
+    if: inputs.auto_release && needs.update.outputs.tests_passed == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Generate a token
+        id: generate-token
+        uses: getsentry/action-github-app-token@d4b5da6c5e37703f8c3b3e43abb5705b46e159cc
+        with:
+          app_id: ${{ secrets.APP_ID }}
+          private_key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.generate-token.outputs.token }}
+
+      - name: Wait for PR to merge
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+        run: |
+          PR_URL="${{ needs.update.outputs.pr_url }}"
+          echo "Waiting for PR to merge: $PR_URL"
+
+          for i in $(seq 1 30); do
+            STATE=$(gh pr view "$PR_URL" --json state -q '.state')
+            if [ "$STATE" = "MERGED" ]; then
+              echo "PR merged!"
+              exit 0
+            elif [ "$STATE" = "CLOSED" ]; then
+              echo "PR was closed without merging."
+              exit 1
+            fi
+            echo "Attempt $i/30 — PR state: $STATE — waiting 30s..."
+            sleep 30
+          done
+
+          echo "Timed out waiting for PR to merge (15 min)."
+          exit 1
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+        run: |
+          TARGET="${{ needs.update.outputs.target_version }}"
+          gh release create "v${TARGET}" \
+            --title "v${TARGET}" \
+            --generate-notes
+          echo "Release v${TARGET} created — Go modules use git tags directly."
