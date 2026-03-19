@@ -1,10 +1,6 @@
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/swipegames/public-api/api/v1.0/core/types v0.0.0-20260317153933-3975293f3308 h1:g9UQHYm14DLZ/ikUUT7J16zC7tBV48cOEiKkzz6NxM0=
-github.com/swipegames/public-api/api/v1.0/core/types v0.0.0-20260317153933-3975293f3308/go.mod h1:ewTt4ILhDfixJC2DCqDdQ+CZJCDYhOfeZtyiNxwKXKg=
-github.com/swipegames/public-api/api/v1.0/core/types v1.2.18 h1:zEamHZRRTO00IWIRZTnlMxp5BVENVdxhOKOKmKlrBAI=
-github.com/swipegames/public-api/api/v1.0/core/types v1.2.18/go.mod h1:ewTt4ILhDfixJC2DCqDdQ+CZJCDYhOfeZtyiNxwKXKg=
-github.com/swipegames/public-api/api/v1.0/swipegames-integration/types v0.0.0-20260317153933-3975293f3308 h1:kDNm5jYhLPY2L+bVZRQCkjBOFHxN4dqmRiRIoqTDLek=
-github.com/swipegames/public-api/api/v1.0/swipegames-integration/types v0.0.0-20260317153933-3975293f3308/go.mod h1:G8bKu6HoIrAEnrPcyFSgrpKN2bensacP6xnBIOVzw4I=
-github.com/swipegames/public-api/api/v1.0/swipegames-integration/types v1.2.18 h1:a8Xm3zIdesHf5/Y+IHITGqU0OxdBrXnTegDy6XRw8gU=
-github.com/swipegames/public-api/api/v1.0/swipegames-integration/types v1.2.18/go.mod h1:G8bKu6HoIrAEnrPcyFSgrpKN2bensacP6xnBIOVzw4I=
+github.com/swipegames/public-api/api/v1.0/core/types v1.2.24 h1:2DxA3ETff3qZ6syCpbnGz16W9nWh6MW0LQKPsqWYwQE=
+github.com/swipegames/public-api/api/v1.0/core/types v1.2.24/go.mod h1:ewTt4ILhDfixJC2DCqDdQ+CZJCDYhOfeZtyiNxwKXKg=
+github.com/swipegames/public-api/api/v1.0/swipegames-integration/types v1.2.24 h1:aosD8k00rOtfnETRjtPCM/I2Vp1oiv9b9xE33T/JmEw=
+github.com/swipegames/public-api/api/v1.0/swipegames-integration/types v1.2.24/go.mod h1:G8bKu6HoIrAEnrPcyFSgrpKN2bensacP6xnBIOVzw4I=

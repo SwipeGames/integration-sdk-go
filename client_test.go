@@ -258,6 +258,50 @@ func TestCreateNewGame(t *testing.T) {
 		}
 	})
 
+	t.Run("returns APIError with code when error response includes code field", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(400)
+			json.NewEncoder(w).Encode(map[string]string{
+				"message": "Game not found",
+				"code":    "game_not_found",
+				"details": "No game with ID sg_unknown",
+			})
+		}))
+		defer server.Close()
+
+		cfg := testConfig
+		cfg.BaseURL = server.URL
+		client, _ := NewClient(cfg)
+
+		_, err := client.CreateNewGame(context.Background(), CreateNewGameParams{
+			GameID:   "sg_unknown",
+			Demo:     false,
+			Platform: PlatformDesktop,
+			Currency: "USD",
+			Locale:   "en_us",
+		})
+
+		var apiErr *APIError
+		if !errors.As(err, &apiErr) {
+			t.Fatalf("expected APIError, got %T: %v", err, err)
+		}
+		if apiErr.StatusCode != 400 {
+			t.Errorf("status: got %d", apiErr.StatusCode)
+		}
+		if apiErr.Code != "game_not_found" {
+			t.Errorf("code: got %s", apiErr.Code)
+		}
+		if apiErr.Message != "Game not found" {
+			t.Errorf("message: got %s", apiErr.Message)
+		}
+		if apiErr.Details != "No game with ID sg_unknown" {
+			t.Errorf("details: got %s", apiErr.Details)
+		}
+		if !strings.Contains(apiErr.Error(), "code=game_not_found") {
+			t.Errorf("Error() should contain code: got %s", apiErr.Error())
+		}
+	})
+
 	t.Run("uses status text when error response is not valid JSON", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(502)
