@@ -152,6 +152,7 @@ jobs:
           CLAUDE_CODE_ATTRIBUTION_HEADER: "0"
         with:
           use_bedrock: "true"
+          allowed_bots: "swipegames-example-app[bot]"
           prompt: |
             Read the prompt file at .github/prompts/auto-update.md and follow its instructions.
 
