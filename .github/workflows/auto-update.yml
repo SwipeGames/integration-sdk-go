@@ -70,7 +70,8 @@ jobs:
           if [ -n "${{ inputs.public_api_version }}" ]; then
             TARGET="${{ inputs.public_api_version }}"
           else
-            TARGET=$(cd public-api && git describe --tags --abbrev=0 | sed 's/^v//')
+            # Tags are prefixed with module path (e.g. "api/v1.0/core/types/v1.2.21") — extract just the version
+            TARGET=$(cd public-api && git tag --sort=-v:refname | grep '^api/v1.0/core/types/v' | head -1 | sed 's|.*/v||')
           fi
           echo "target=$TARGET" >> "$GITHUB_OUTPUT"
 
