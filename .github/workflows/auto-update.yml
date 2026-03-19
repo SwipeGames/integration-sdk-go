@@ -240,10 +240,6 @@ jobs:
           ## Changes
 
           ${CHANGES}
-
-          ---
-
-          🤖 Generated with [Claude Code](https://claude.ai/code)
           EOF
           )
 
