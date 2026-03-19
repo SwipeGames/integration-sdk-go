@@ -119,6 +119,16 @@ Follow existing Go test patterns exactly:
 4. If any command fails, read the error output carefully, fix the issues, and re-run
 5. Repeat until all three pass cleanly
 
+## Step 6: Write changes summary
+
+Write a concise markdown summary of the SDK changes to `/tmp/sdk-changes-summary.md`. This will be included in the PR description. Focus on what changed from the **SDK user's perspective**:
+- New methods, types, or response builders added
+- Changed method signatures or validation rules
+- New fields on param structs or response types
+- Any breaking changes
+
+Use bullet points. Do NOT include internal implementation details or test changes.
+
 ## Constraints
 
 - **Single package at root**: all code is `package swipegames` at the repo root — no `internal/`, no sub-packages
