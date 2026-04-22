@@ -72,6 +72,9 @@ type ErrorResponseWithCodeAndActionCode = integrationapiv1.ErrorResponseWithCode
 // ErrorResponseWithCodeAndActionAction is the action for integration error responses.
 type ErrorResponseWithCodeAndActionAction = integrationapiv1.ErrorResponseWithCodeAndActionAction
 
+// ErrorResponseCode is the error code for core API error responses.
+type ErrorResponseCode = coreapiv1.ErrorResponseCode
+
 // ── Re-exported constants ──
 
 const (
@@ -86,6 +89,12 @@ const (
 	// Win request types
 	WinRequestTypeRegular WinRequestType = integrationapiv1.WinRequestTypeRegular
 	WinRequestTypeFree    WinRequestType = integrationapiv1.WinRequestTypeFree
+
+	// Core API error codes
+	CoreErrorCodeAccountBlocked       ErrorResponseCode = coreapiv1.AccountBlocked
+	CoreErrorCodeCurrencyNotSupported ErrorResponseCode = coreapiv1.CurrencyNotSupported
+	CoreErrorCodeGameNotFound         ErrorResponseCode = coreapiv1.GameNotFound
+	CoreErrorCodeLocaleNotSupported   ErrorResponseCode = coreapiv1.LocaleNotSupported
 
 	// Error codes (integration)
 	ErrorCodeAccountBlocked        ErrorResponseWithCodeAndActionCode = integrationapiv1.AccountBlocked
