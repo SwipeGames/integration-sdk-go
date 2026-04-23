@@ -304,6 +304,9 @@ func (c *Client) parseAPIError(resp *http.Response, label string) error {
 		StatusCode: resp.StatusCode,
 		Message:    errBody.Message,
 	}
+	if errBody.Code != nil {
+		apiErr.Code = string(*errBody.Code)
+	}
 	if errBody.Details != nil {
 		apiErr.Details = *errBody.Details
 	}
