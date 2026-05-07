@@ -91,13 +91,31 @@ func (c *Client) CreateNewGame(ctx context.Context, params CreateNewGameParams) 
 
 // GetGames returns information about all supported games.
 func (c *Client) GetGames(ctx context.Context) ([]GameInfo, error) {
+	return c.GetGamesWithOptions(ctx, nil)
+}
+
+// GetGamesWithOptions returns information about all supported games with optional parameters.
+// Pass nil for default behavior. Use GetGamesParams to exclude bet lines or enable gzip compression.
+func (c *Client) GetGamesWithOptions(ctx context.Context, params *GetGamesParams) ([]GameInfo, error) {
 	queryParams := map[string]string{
 		"cID":    c.cid,
 		"extCID": c.extCID,
 	}
 
+	var headers map[string]string
+	if params != nil {
+		if params.ExcludeBetLines != nil && *params.ExcludeBetLines {
+			queryParams["excludeBetLines"] = "true"
+		}
+		if params.AcceptEncoding != nil {
+			headers = map[string]string{
+				"Accept-Encoding": string(*params.AcceptEncoding),
+			}
+		}
+	}
+
 	var result []GameInfo
-	if err := c.doGet(ctx, "/games", queryParams, &result); err != nil {
+	if err := c.doGetWithHeaders(ctx, "/games", queryParams, headers, &result); err != nil {
 		return nil, err
 	}
 	return result, nil
@@ -198,6 +216,10 @@ func (c *Client) doPost(ctx context.Context, path string, body map[string]interf
 }
 
 func (c *Client) doGet(ctx context.Context, path string, queryParams map[string]string, result interface{}) error {
+	return c.doGetWithHeaders(ctx, path, queryParams, nil, result)
+}
+
+func (c *Client) doGetWithHeaders(ctx context.Context, path string, queryParams map[string]string, extraHeaders map[string]string, result interface{}) error {
 	u, err := url.Parse(c.baseURL + path)
 	if err != nil {
 		return fmt.Errorf("failed to parse URL: %w", err)
@@ -222,6 +244,9 @@ func (c *Client) doGet(ctx context.Context, path string, queryParams map[string]
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("X-REQUEST-SIGN", sig)
+	for k, v := range extraHeaders {
+		req.Header.Set(k, v)
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

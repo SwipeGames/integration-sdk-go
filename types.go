@@ -75,12 +75,20 @@ type ErrorResponseWithCodeAndActionAction = integrationapiv1.ErrorResponseWithCo
 // ErrorResponseCode is the error code for core API error responses.
 type ErrorResponseCode = coreapiv1.ErrorResponseCode
 
+// ── Re-exported types from public-api (core - GetGames params) ──
+
+// GetGamesParamsAcceptEncoding is the Accept-Encoding header value for GetGames.
+type GetGamesParamsAcceptEncoding = coreapiv1.GetGamesParamsAcceptEncoding
+
 // ── Re-exported constants ──
 
 const (
 	// Platform types
 	PlatformDesktop PlatformType = coreapiv1.Desktop
 	PlatformMobile  PlatformType = coreapiv1.Mobile
+
+	// GetGames Accept-Encoding
+	AcceptEncodingGzip GetGamesParamsAcceptEncoding = coreapiv1.Gzip
 
 	// Bet request types
 	BetRequestTypeRegular BetRequestType = integrationapiv1.BetRequestTypeRegular
@@ -149,6 +157,16 @@ type CreateFreeRoundsParams struct {
 type CancelFreeRoundsParams struct {
 	ID    string `json:"id,omitempty"`
 	ExtID string `json:"extID,omitempty"`
+}
+
+// GetGamesParams contains optional parameters for the GetGames request.
+type GetGamesParams struct {
+	// ExcludeBetLines omits betLines from the response when true, reducing payload size.
+	ExcludeBetLines *bool `json:"excludeBetLines,omitempty"`
+
+	// AcceptEncoding sets the Accept-Encoding header. Use AcceptEncodingGzip to
+	// request gzip compression (recommended — response can exceed 1 MB).
+	AcceptEncoding *GetGamesParamsAcceptEncoding `json:"acceptEncoding,omitempty"`
 }
 
 // GetBalanceQuery represents parsed query parameters for a balance request.
