@@ -374,6 +374,137 @@ func TestGetGames(t *testing.T) {
 	})
 }
 
+func TestGetGamesWithOptions(t *testing.T) {
+	t.Run("sends excludeBetLines query param when true", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Query().Get("excludeBetLines") != "true" {
+				t.Errorf("expected excludeBetLines=true, got %s", r.URL.Query().Get("excludeBetLines"))
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode([]map[string]string{{"id": "sg_catch_97"}})
+		}))
+		defer server.Close()
+
+		cfg := testConfig
+		cfg.BaseURL = server.URL
+		client, _ := NewClient(cfg)
+
+		excludeBetLines := true
+		result, err := client.GetGamesWithOptions(context.Background(), &GetGamesParams{
+			ExcludeBetLines: &excludeBetLines,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(result) != 1 {
+			t.Fatalf("expected 1 game, got %d", len(result))
+		}
+	})
+
+	t.Run("does not send excludeBetLines when nil", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Query().Get("excludeBetLines") != "" {
+				t.Errorf("expected no excludeBetLines param, got %s", r.URL.Query().Get("excludeBetLines"))
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode([]map[string]string{{"id": "sg_catch_97"}})
+		}))
+		defer server.Close()
+
+		cfg := testConfig
+		cfg.BaseURL = server.URL
+		client, _ := NewClient(cfg)
+
+		_, err := client.GetGamesWithOptions(context.Background(), &GetGamesParams{})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("sends Accept-Encoding header when specified", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Header.Get("Accept-Encoding") != "gzip" {
+				t.Errorf("expected Accept-Encoding: gzip, got %s", r.Header.Get("Accept-Encoding"))
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode([]map[string]string{{"id": "sg_catch_97"}})
+		}))
+		defer server.Close()
+
+		cfg := testConfig
+		cfg.BaseURL = server.URL
+		client, _ := NewClient(cfg)
+
+		enc := AcceptEncodingGzip
+		_, err := client.GetGamesWithOptions(context.Background(), &GetGamesParams{
+			AcceptEncoding: &enc,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("nil params behaves like GetGames", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Query().Get("cID") != testConfig.CID {
+				t.Errorf("missing cID query param")
+			}
+			if r.URL.Query().Get("extCID") != testConfig.ExtCID {
+				t.Errorf("missing extCID query param")
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode([]map[string]string{{"id": "sg_catch_97"}})
+		}))
+		defer server.Close()
+
+		cfg := testConfig
+		cfg.BaseURL = server.URL
+		client, _ := NewClient(cfg)
+
+		result, err := client.GetGamesWithOptions(context.Background(), nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(result) != 1 {
+			t.Fatalf("expected 1 game, got %d", len(result))
+		}
+	})
+
+	t.Run("includes excludeBetLines in signature", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			params := map[string]string{
+				"cID":             testConfig.CID,
+				"extCID":          testConfig.ExtCID,
+				"excludeBetLines": "true",
+			}
+			expectedSig, _ := createQueryParamsSignature(params, testConfig.APIKey)
+			if r.Header.Get("X-REQUEST-SIGN") != expectedSig {
+				t.Errorf("signature mismatch: got %s, want %s", r.Header.Get("X-REQUEST-SIGN"), expectedSig)
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode([]map[string]string{})
+		}))
+		defer server.Close()
+
+		cfg := testConfig
+		cfg.BaseURL = server.URL
+		client, _ := NewClient(cfg)
+
+		excludeBetLines := true
+		_, err := client.GetGamesWithOptions(context.Background(), &GetGamesParams{
+			ExcludeBetLines: &excludeBetLines,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+}
+
 func TestCreateFreeRounds(t *testing.T) {
 	t.Run("sends signed POST to /free-rounds", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

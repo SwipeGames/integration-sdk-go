@@ -272,6 +272,49 @@ func TestParseAndVerifyRefundRequest(t *testing.T) {
 		}
 	})
 
+	t.Run("parses optional roundID field", func(t *testing.T) {
+		body := map[string]interface{}{
+			"sessionID": "s1",
+			"txID":      "550e8400-e29b-41d4-a716-446655440001",
+			"origTxID":  "550e8400-e29b-41d4-a716-446655440000",
+			"amount":    "10.00",
+			"roundID":   "770e8400-e29b-41d4-a716-446655440000",
+		}
+		rawBody, _ := json.Marshal(body)
+		sig := signBody(string(rawBody))
+
+		refund, err := client.ParseAndVerifyRefundRequest(string(rawBody), sig)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if refund.RoundID == nil {
+			t.Fatal("expected roundID to be set")
+		}
+		expected := "770e8400-e29b-41d4-a716-446655440000"
+		if refund.RoundID.String() != expected {
+			t.Errorf("roundID: got %s, want %s", refund.RoundID.String(), expected)
+		}
+	})
+
+	t.Run("succeeds without optional roundID field", func(t *testing.T) {
+		body := map[string]interface{}{
+			"sessionID": "s1",
+			"txID":      "550e8400-e29b-41d4-a716-446655440001",
+			"origTxID":  "550e8400-e29b-41d4-a716-446655440000",
+			"amount":    "10.00",
+		}
+		rawBody, _ := json.Marshal(body)
+		sig := signBody(string(rawBody))
+
+		refund, err := client.ParseAndVerifyRefundRequest(string(rawBody), sig)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if refund.RoundID != nil {
+			t.Errorf("expected roundID to be nil, got %s", refund.RoundID.String())
+		}
+	})
+
 	t.Run("rejects when missing required fields", func(t *testing.T) {
 		body := `{"sessionID":"s1","amount":"10.00"}`
 		sig := signBody(body)
