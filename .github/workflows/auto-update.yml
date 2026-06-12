@@ -264,19 +264,19 @@ jobs:
         run: |
           gh pr merge "${{ steps.create-pr.outputs.pr_url }}" --auto --squash
 
+      # Fires on every run that produced an update (always()), independent of the
+      # auto-merge / auto-release inputs — so disabling auto-merge does not suppress it.
       - name: Slack notification
-        if: always() && steps.versions.outputs.up_to_date == 'false' && steps.check-branch.outputs.exists == 'false' && env.SLACK_WEBHOOK_URL != ''
+        if: always() && steps.versions.outputs.up_to_date == 'false' && steps.check-branch.outputs.exists == 'false' && env.SLACK_WEBHOOK != ''
+        continue-on-error: true
+        uses: rtCamp/action-slack-notify@v2
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        run: |
-          TARGET="${{ steps.versions.outputs.target }}"
-          TESTS_PASSED="${{ steps.final-tests.outputs.passed }}"
-          PR_URL="${{ steps.create-pr.outputs.pr_url }}"
-          STATUS=$([ "$TESTS_PASSED" = "true" ] && echo "✅ Tests passing" || echo "❌ Tests failing")
-
-          curl -s -X POST "$SLACK_WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "{\"text\":\"Go SDK auto-update to public-api v${TARGET}: ${STATUS}\\n${PR_URL}\"}"
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_TITLE: "Go SDK auto-update → public-api v${{ steps.versions.outputs.target }}"
+          SLACK_MESSAGE: "${{ steps.final-tests.outputs.passed == 'true' && '✅ Tests passing' || '❌ Tests failing' }}\n${{ steps.create-pr.outputs.pr_url }}"
+          SLACK_COLOR: ${{ steps.final-tests.outputs.passed == 'true' && 'good' || 'danger' }}
+          SLACK_FOOTER: "integration-sdk-go • ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          MSG_MINIMAL: "true"
 
   release:
     needs: update
