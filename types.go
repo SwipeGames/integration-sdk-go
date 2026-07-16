@@ -80,6 +80,9 @@ type ErrorResponseCode = coreapiv1.ErrorResponseCode
 // GetGamesParamsAcceptEncoding is the Accept-Encoding header value for GetGames.
 type GetGamesParamsAcceptEncoding = coreapiv1.GetGamesParamsAcceptEncoding
 
+// CurrencyFilter is a currency filter for the games list.
+type CurrencyFilter = coreapiv1.CurrencyFilter
+
 // ── Re-exported constants ──
 
 const (
@@ -89,6 +92,14 @@ const (
 
 	// GetGames Accept-Encoding
 	AcceptEncodingGzip GetGamesParamsAcceptEncoding = coreapiv1.Gzip
+
+	// Currency filters
+	CurrencyFilterMain       CurrencyFilter = coreapiv1.Main
+	CurrencyFilterMainCrypto CurrencyFilter = coreapiv1.MainCrypto
+	CurrencyFilterMainFiat   CurrencyFilter = coreapiv1.MainFiat
+	CurrencyFilterSubCrypto  CurrencyFilter = coreapiv1.SubCrypto
+	CurrencyFilterSubFiat    CurrencyFilter = coreapiv1.SubFiat
+	CurrencyFilterVirtual    CurrencyFilter = coreapiv1.Virtual
 
 	// Bet request types
 	BetRequestTypeRegular BetRequestType = integrationapiv1.BetRequestTypeRegular
@@ -163,6 +174,16 @@ type CancelFreeRoundsParams struct {
 type GetGamesParams struct {
 	// ExcludeBetLines omits betLines from the response when true, reducing payload size.
 	ExcludeBetLines *bool `json:"excludeBetLines,omitempty"`
+
+	// CurrencyFilters filters the currencies returned for each game.
+	// When provided, each game's currencies and betLines contain only codes
+	// matching the filters (plus AdditionalCurrencies).
+	CurrencyFilters []CurrencyFilter `json:"currencyFilters,omitempty"`
+
+	// AdditionalCurrencies is an optional list of currency codes to include
+	// in addition to those matched by CurrencyFilters. Only meaningful
+	// together with CurrencyFilters.
+	AdditionalCurrencies []string `json:"additionalCurrencies,omitempty"`
 
 	// AcceptEncoding sets the Accept-Encoding header. Use AcceptEncodingGzip to
 	// request gzip compression (recommended — response can exceed 1 MB).
