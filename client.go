@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 // Client is the Swipe Games SDK client.
@@ -106,6 +107,12 @@ func (c *Client) GetGamesWithOptions(ctx context.Context, params *GetGamesParams
 	if params != nil {
 		if params.ExcludeBetLines != nil && *params.ExcludeBetLines {
 			queryParams["excludeBetLines"] = "true"
+		}
+		if len(params.CurrencyFilters) > 0 {
+			queryParams["currencyFilters"] = joinCurrencyFilters(params.CurrencyFilters)
+		}
+		if len(params.AdditionalCurrencies) > 0 {
+			queryParams["additionalCurrencies"] = strings.Join(params.AdditionalCurrencies, ",")
 		}
 		if params.AcceptEncoding != nil {
 			headers = map[string]string{
@@ -336,4 +343,12 @@ func (c *Client) parseAPIError(resp *http.Response, label string) error {
 		apiErr.Details = *errBody.Details
 	}
 	return apiErr
+}
+
+func joinCurrencyFilters(filters []CurrencyFilter) string {
+	s := make([]string, len(filters))
+	for i, f := range filters {
+		s[i] = string(f)
+	}
+	return strings.Join(s, ",")
 }

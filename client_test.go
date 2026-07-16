@@ -503,6 +503,108 @@ func TestGetGamesWithOptions(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
+
+	t.Run("sends currencyFilters query param", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			got := r.URL.Query().Get("currencyFilters")
+			if got != "main_fiat,main_crypto" {
+				t.Errorf("expected currencyFilters=main_fiat,main_crypto, got %s", got)
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode([]map[string]string{{"id": "sg_catch_97"}})
+		}))
+		defer server.Close()
+
+		cfg := testConfig
+		cfg.BaseURL = server.URL
+		client, _ := NewClient(cfg)
+
+		_, err := client.GetGamesWithOptions(context.Background(), &GetGamesParams{
+			CurrencyFilters: []CurrencyFilter{CurrencyFilterMainFiat, CurrencyFilterMainCrypto},
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("sends additionalCurrencies query param", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			got := r.URL.Query().Get("additionalCurrencies")
+			if got != "mETH,uBTC" {
+				t.Errorf("expected additionalCurrencies=mETH,uBTC, got %s", got)
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode([]map[string]string{{"id": "sg_catch_97"}})
+		}))
+		defer server.Close()
+
+		cfg := testConfig
+		cfg.BaseURL = server.URL
+		client, _ := NewClient(cfg)
+
+		_, err := client.GetGamesWithOptions(context.Background(), &GetGamesParams{
+			CurrencyFilters:      []CurrencyFilter{CurrencyFilterMain},
+			AdditionalCurrencies: []string{"mETH", "uBTC"},
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("does not send currencyFilters when empty", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Query().Get("currencyFilters") != "" {
+				t.Errorf("expected no currencyFilters param, got %s", r.URL.Query().Get("currencyFilters"))
+			}
+			if r.URL.Query().Get("additionalCurrencies") != "" {
+				t.Errorf("expected no additionalCurrencies param, got %s", r.URL.Query().Get("additionalCurrencies"))
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode([]map[string]string{{"id": "sg_catch_97"}})
+		}))
+		defer server.Close()
+
+		cfg := testConfig
+		cfg.BaseURL = server.URL
+		client, _ := NewClient(cfg)
+
+		_, err := client.GetGamesWithOptions(context.Background(), &GetGamesParams{})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("includes currencyFilters in signature", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			params := map[string]string{
+				"cID":             testConfig.CID,
+				"extCID":          testConfig.ExtCID,
+				"currencyFilters": "main",
+			}
+			expectedSig, _ := createQueryParamsSignature(params, testConfig.APIKey)
+			if r.Header.Get("X-REQUEST-SIGN") != expectedSig {
+				t.Errorf("signature mismatch: got %s, want %s", r.Header.Get("X-REQUEST-SIGN"), expectedSig)
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode([]map[string]string{})
+		}))
+		defer server.Close()
+
+		cfg := testConfig
+		cfg.BaseURL = server.URL
+		client, _ := NewClient(cfg)
+
+		_, err := client.GetGamesWithOptions(context.Background(), &GetGamesParams{
+			CurrencyFilters: []CurrencyFilter{CurrencyFilterMain},
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
 }
 
 func TestCreateFreeRounds(t *testing.T) {
