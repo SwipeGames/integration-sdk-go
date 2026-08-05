@@ -284,6 +284,49 @@ jobs:
 
       # Fires on every run that produced an update (always()), independent of the
       # auto-merge / auto-release inputs — so disabling auto-merge does not suppress it.
+      # Compute the notification text here rather than inline in the Slack step.
+      # The old inline ternary keyed solely off final-tests.outputs.passed, so every
+      # non-"true" value — including empty because the step never ran — rendered as
+      # "❌ Tests failing". When the Claude step aborted the job, that reported a test
+      # failure that had never happened. Report each stage on its own line instead,
+      # so "tests failed", "tests never ran" and "Claude died" stay distinguishable.
+      - name: Build Slack status
+        id: slack-status
+        if: always() && steps.versions.outputs.up_to_date == 'false' && steps.check-branch.outputs.exists == 'false'
+        run: |
+          CLAUDE_OUTCOME="${{ steps.claude.outcome }}"
+          TESTS_OUTCOME="${{ steps.final-tests.outcome }}"
+          TESTS_PASSED="${{ steps.final-tests.outputs.passed }}"
+          PR_URL="${{ steps.create-pr.outputs.pr_url }}"
+
+          COLOR="good"
+
+          if [ "$CLAUDE_OUTCOME" = "success" ]; then
+            CLAUDE_LINE="Claude: ✅ completed"
+          else
+            CLAUDE_LINE="Claude: ❌ ${CLAUDE_OUTCOME:-did not run}"
+            COLOR="danger"
+          fi
+
+          if [ "$TESTS_PASSED" = "true" ]; then
+            TESTS_LINE="Tests: ✅ passing"
+          elif [ "$TESTS_OUTCOME" = "failure" ] || [ "$TESTS_OUTCOME" = "success" ]; then
+            TESTS_LINE="Tests: ❌ failing"
+            COLOR="danger"
+          else
+            TESTS_LINE="Tests: ⚠️ did not run (${TESTS_OUTCOME:-skipped})"
+            COLOR="danger"
+          fi
+
+          if [ -n "$PR_URL" ]; then
+            PR_LINE="$PR_URL"
+          else
+            PR_LINE="No PR was created — see the run log."
+          fi
+
+          echo "message=${CLAUDE_LINE}\n${TESTS_LINE}\n${PR_LINE}" >> "$GITHUB_OUTPUT"
+          echo "color=${COLOR}" >> "$GITHUB_OUTPUT"
+
       - name: Slack notification
         if: always() && steps.versions.outputs.up_to_date == 'false' && steps.check-branch.outputs.exists == 'false' && env.SLACK_WEBHOOK != ''
         continue-on-error: true
@@ -291,8 +334,8 @@ jobs:
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_TITLE: "Go SDK auto-update → public-api v${{ steps.versions.outputs.target }}"
-          SLACK_MESSAGE: "${{ steps.final-tests.outputs.passed == 'true' && '✅ Tests passing' || '❌ Tests failing' }}\n${{ steps.create-pr.outputs.pr_url }}"
-          SLACK_COLOR: ${{ steps.final-tests.outputs.passed == 'true' && 'good' || 'danger' }}
+          SLACK_MESSAGE: "${{ steps.slack-status.outputs.message }}"
+          SLACK_COLOR: ${{ steps.slack-status.outputs.color }}
           SLACK_FOOTER: "integration-sdk-go • ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           MSG_MINIMAL: "true"
 
