@@ -180,8 +180,13 @@ jobs:
           claude_args: '--model global.anthropic.claude-opus-4-8 --allowedTools "Bash,Read,Write,Edit,MultiEdit,Glob,Grep"'
           timeout_minutes: "30"
 
+      # Only meaningful if Claude finished. On a partial run the suite reports on an
+      # artefact nobody intends to ship, and a green result would be actively harmful:
+      # `passed` feeds the auto-merge gate and the release job, so passing tests over
+      # half-finished code could squash-merge and publish it. Leaving `passed` unset
+      # keeps both gates closed.
       - name: Run final tests
-        if: steps.versions.outputs.up_to_date == 'false' && steps.check-branch.outputs.exists == 'false'
+        if: steps.versions.outputs.up_to_date == 'false' && steps.check-branch.outputs.exists == 'false' && steps.claude.outcome == 'success'
         id: final-tests
         continue-on-error: true
         run: |
@@ -275,6 +280,7 @@ jobs:
         if: >-
           steps.versions.outputs.up_to_date == 'false' &&
           steps.check-branch.outputs.exists == 'false' &&
+          steps.claude.outcome == 'success' &&
           steps.final-tests.outputs.passed == 'true' &&
           (inputs.auto_merge || inputs.auto_release)
         env:
