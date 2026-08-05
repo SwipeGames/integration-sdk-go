@@ -145,6 +145,10 @@ jobs:
       - name: Run Claude Code for SDK update
         if: steps.versions.outputs.up_to_date == 'false' && steps.check-branch.outputs.exists == 'false'
         id: claude
+        # Never let a Claude-side failure (turn/time limit, transient API error)
+        # discard the dependency bump — downstream steps still open a PR,
+        # labelled needs-review when the tests don't pass.
+        continue-on-error: true
         uses: anthropics/claude-code-action@v1
         env:
           AWS_BEARER_TOKEN_BEDROCK: ${{ secrets.BEDROCK_API_KEY }}
@@ -168,7 +172,12 @@ jobs:
 
             IMPORTANT: As your FINAL step, write a concise markdown summary of the SDK changes you made to /tmp/sdk-changes-summary.md. This will be included in the PR description. Focus on what changed from the SDK user's perspective (new methods, new types, changed signatures, new validations, etc.). Use bullet points. Do NOT include internal implementation details.
           direct_prompt: true
-          claude_args: '--model global.anthropic.claude-opus-4-6-v1 --max-turns 30 --allowedTools "Bash,Read,Write,Edit,MultiEdit,Glob,Grep"'
+          # No --max-turns: a large public-api diff legitimately needs more turns
+          # than any fixed number we'd guess. timeout_minutes is the real backstop.
+          # Bedrock global cross-region inference profile. Note: Opus 4.7+ dropped
+          # the "-v1" suffix that 4.6 and earlier carried — the ID is exactly as
+          # published on the model card, not a pattern to extrapolate.
+          claude_args: '--model global.anthropic.claude-opus-4-8 --allowedTools "Bash,Read,Write,Edit,MultiEdit,Glob,Grep"'
           timeout_minutes: "30"
 
       - name: Run final tests
@@ -211,8 +220,9 @@ jobs:
           TARGET="${{ steps.versions.outputs.target }}"
           CURRENT="${{ steps.versions.outputs.current }}"
           TESTS_PASSED="${{ steps.final-tests.outputs.passed }}"
+          CLAUDE_OUTCOME="${{ steps.claude.outcome }}"
 
-          if [ "$TESTS_PASSED" = "true" ]; then
+          if [ "$TESTS_PASSED" = "true" ] && [ "$CLAUDE_OUTCOME" = "success" ]; then
             LABEL="auto-update:passing"
           else
             LABEL="auto-update:needs-review"
@@ -230,11 +240,19 @@ jobs:
             CHANGES="No detailed changes summary available."
           fi
 
+          # Flag a Claude step that errored out — its work may be incomplete.
+          CLAUDE_NOTE=""
+          if [ "$CLAUDE_OUTCOME" != "success" ]; then
+            CLAUDE_NOTE="> ⚠️ The Claude step did not complete successfully (\`${CLAUDE_OUTCOME}\`). The SDK changes below may be partial — review before merging. See the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details."
+          fi
+
           # Build PR body
           BODY=$(cat <<EOF
           ## Summary
 
           Updates \`swipegames/public-api\` from \`v${CURRENT}\` to \`v${TARGET}\`.
+
+          ${CLAUDE_NOTE}
 
           **Tests:** $([ "$TESTS_PASSED" = "true" ] && echo "✅ Passing" || echo "❌ Failing — manual review required")
 
