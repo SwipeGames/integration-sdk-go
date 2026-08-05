@@ -145,6 +145,7 @@ jobs:
       - name: Run Claude Code for SDK update
         if: steps.versions.outputs.up_to_date == 'false' && steps.check-branch.outputs.exists == 'false'
         id: claude
+        timeout-minutes: 30
         uses: anthropics/claude-code-action@v1
         env:
           AWS_BEARER_TOKEN_BEDROCK: ${{ secrets.BEDROCK_API_KEY }}
@@ -167,9 +168,7 @@ jobs:
             IMPORTANT: After making all changes, run `go test ./...` and `go vet ./...` to verify everything works. Fix any failures before finishing.
 
             IMPORTANT: As your FINAL step, write a concise markdown summary of the SDK changes you made to /tmp/sdk-changes-summary.md. This will be included in the PR description. Focus on what changed from the SDK user's perspective (new methods, new types, changed signatures, new validations, etc.). Use bullet points. Do NOT include internal implementation details.
-          direct_prompt: true
-          claude_args: '--model global.anthropic.claude-opus-4-6-v1 --max-turns 30 --allowedTools "Bash,Read,Write,Edit,MultiEdit,Glob,Grep"'
-          timeout_minutes: "30"
+          claude_args: '--model global.anthropic.claude-opus-4-8 --allowedTools "Bash,Read,Write,Edit,MultiEdit,Glob,Grep"'
 
       - name: Run final tests
         if: steps.versions.outputs.up_to_date == 'false' && steps.check-branch.outputs.exists == 'false'
