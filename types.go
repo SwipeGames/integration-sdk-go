@@ -22,6 +22,9 @@ type CreateNewGameResponse = coreapiv1.CreateNewGameResponse
 // CreateFreeRoundsResponse is returned when a free rounds campaign is created.
 type CreateFreeRoundsResponse = coreapiv1.CreateFreeRoundsResponse
 
+// FreeRoundsInfoResponse is returned when querying a free rounds campaign.
+type FreeRoundsInfoResponse = coreapiv1.FreeRoundsInfoResponse
+
 // GameInfo contains information about a game.
 type GameInfo = coreapiv1.GameInfo
 
@@ -110,10 +113,10 @@ const (
 	WinRequestTypeFree    WinRequestType = integrationapiv1.WinRequestTypeFree
 
 	// Core API error codes
-	CoreErrorCodeAccountBlocked       ErrorResponseCode = coreapiv1.AccountBlocked
-	CoreErrorCodeCurrencyNotSupported ErrorResponseCode = coreapiv1.CurrencyNotSupported
-	CoreErrorCodeGameNotFound         ErrorResponseCode = coreapiv1.GameNotFound
-	CoreErrorCodeLocaleNotSupported   ErrorResponseCode = coreapiv1.LocaleNotSupported
+	CoreErrorCodeAccountBlocked       ErrorResponseCode = coreapiv1.ErrorResponseCodeAccountBlocked
+	CoreErrorCodeCurrencyNotSupported ErrorResponseCode = coreapiv1.ErrorResponseCodeCurrencyNotSupported
+	CoreErrorCodeGameNotFound         ErrorResponseCode = coreapiv1.ErrorResponseCodeGameNotFound
+	CoreErrorCodeLocaleNotSupported   ErrorResponseCode = coreapiv1.ErrorResponseCodeLocaleNotSupported
 
 	// Error codes (integration)
 	ErrorCodeAccountBlocked        ErrorResponseWithCodeAndActionCode = integrationapiv1.AccountBlocked
@@ -137,16 +140,17 @@ const (
 // CreateNewGameParams contains parameters for creating a new game session.
 // CID and ExtCID are automatically added by the client.
 type CreateNewGameParams struct {
-	GameID          string       `json:"gameID"`
-	Demo            bool         `json:"demo"`
-	Platform        PlatformType `json:"platform"`
-	Currency        string       `json:"currency"`
-	Locale          string       `json:"locale"`
-	SessionID       string       `json:"sessionID,omitempty"`
-	ReturnURL       string       `json:"returnURL,omitempty"`
-	DepositURL      string       `json:"depositURL,omitempty"`
-	InitDemoBalance string       `json:"initDemoBalance,omitempty"`
-	User            *User        `json:"user,omitempty"`
+	GameID                  string       `json:"gameID"`
+	Demo                    bool         `json:"demo"`
+	Platform                PlatformType `json:"platform"`
+	Currency                string       `json:"currency"`
+	Locale                  string       `json:"locale"`
+	FallbackToDefaultLocale *bool        `json:"fallbackToDefaultLocale,omitempty"`
+	SessionID               string       `json:"sessionID,omitempty"`
+	ReturnURL               string       `json:"returnURL,omitempty"`
+	DepositURL              string       `json:"depositURL,omitempty"`
+	InitDemoBalance         string       `json:"initDemoBalance,omitempty"`
+	User                    *User        `json:"user,omitempty"`
 }
 
 // CreateFreeRoundsParams contains parameters for creating a free rounds campaign.
@@ -166,6 +170,14 @@ type CreateFreeRoundsParams struct {
 // At least one of ID or ExtID must be provided.
 // CID and ExtCID are automatically added by the client.
 type CancelFreeRoundsParams struct {
+	ID    string `json:"id,omitempty"`
+	ExtID string `json:"extID,omitempty"`
+}
+
+// GetFreeRoundsInfoParams contains parameters for getting free rounds campaign info.
+// At least one of ID or ExtID must be provided.
+// CID and ExtCID are automatically added by the client.
+type GetFreeRoundsInfoParams struct {
 	ID    string `json:"id,omitempty"`
 	ExtID string `json:"extID,omitempty"`
 }
