@@ -659,6 +659,201 @@ func TestCreateFreeRounds(t *testing.T) {
 	})
 }
 
+func TestGetFreeRoundsInfo(t *testing.T) {
+	t.Run("sends signed GET to /free-rounds with extID", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != "GET" {
+				t.Errorf("expected GET, got %s", r.Method)
+			}
+			if !strings.HasSuffix(r.URL.Path, "/free-rounds") {
+				t.Errorf("unexpected path: %s", r.URL.Path)
+			}
+			if r.URL.Query().Get("cID") != testConfig.CID {
+				t.Errorf("missing cID query param")
+			}
+			if r.URL.Query().Get("extCID") != testConfig.ExtCID {
+				t.Errorf("missing extCID query param")
+			}
+			if r.URL.Query().Get("extID") != "ext-fr-1" {
+				t.Errorf("extID: got %s", r.URL.Query().Get("extID"))
+			}
+			if r.Header.Get("X-REQUEST-SIGN") == "" {
+				t.Errorf("missing X-REQUEST-SIGN header")
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"id":        "550e8400-e29b-41d4-a716-446655440077",
+				"extID":     "ext-fr-1",
+				"quantity":  10,
+				"maxBet":    "0.10",
+				"maxMult":   5.0,
+				"currency":  "USD",
+				"validFrom": "2026-01-01T00:00:00.000Z",
+			})
+		}))
+		defer server.Close()
+
+		cfg := testConfig
+		cfg.BaseURL = server.URL
+		client, _ := NewClient(cfg)
+
+		result, err := client.GetFreeRoundsInfo(context.Background(), GetFreeRoundsInfoParams{
+			ExtID: "ext-fr-1",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		expectedID := uuid.MustParse("550e8400-e29b-41d4-a716-446655440077")
+		if result.Id != expectedID {
+			t.Errorf("id: got %s", result.Id)
+		}
+		if result.ExtID != "ext-fr-1" {
+			t.Errorf("extID: got %s", result.ExtID)
+		}
+		if result.Quantity != 10 {
+			t.Errorf("quantity: got %d", result.Quantity)
+		}
+		if result.MaxBet != "0.10" {
+			t.Errorf("maxBet: got %s", result.MaxBet)
+		}
+		if result.Currency != "USD" {
+			t.Errorf("currency: got %s", result.Currency)
+		}
+	})
+
+	t.Run("sends id query param when provided", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Query().Get("id") != "550e8400-e29b-41d4-a716-446655440077" {
+				t.Errorf("id: got %s", r.URL.Query().Get("id"))
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"id":        "550e8400-e29b-41d4-a716-446655440077",
+				"extID":     "ext-fr-1",
+				"quantity":  10,
+				"maxBet":    "0.10",
+				"maxMult":   5.0,
+				"currency":  "USD",
+				"validFrom": "2026-01-01T00:00:00.000Z",
+			})
+		}))
+		defer server.Close()
+
+		cfg := testConfig
+		cfg.BaseURL = server.URL
+		client, _ := NewClient(cfg)
+
+		_, err := client.GetFreeRoundsInfo(context.Background(), GetFreeRoundsInfoParams{
+			ID: "550e8400-e29b-41d4-a716-446655440077",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("returns ValidationError when neither id nor extID provided", func(t *testing.T) {
+		cfg := testConfig
+		cfg.BaseURL = "http://localhost"
+		client, _ := NewClient(cfg)
+
+		_, err := client.GetFreeRoundsInfo(context.Background(), GetFreeRoundsInfoParams{})
+		var valErr *ValidationError
+		if !errors.As(err, &valErr) {
+			t.Fatalf("expected ValidationError, got %T: %v", err, err)
+		}
+	})
+
+	t.Run("returns APIError on 404", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(404)
+			json.NewEncoder(w).Encode(map[string]string{
+				"message": "Free rounds not found",
+			})
+		}))
+		defer server.Close()
+
+		cfg := testConfig
+		cfg.BaseURL = server.URL
+		client, _ := NewClient(cfg)
+
+		_, err := client.GetFreeRoundsInfo(context.Background(), GetFreeRoundsInfoParams{
+			ExtID: "nonexistent",
+		})
+
+		var apiErr *APIError
+		if !errors.As(err, &apiErr) {
+			t.Fatalf("expected APIError, got %T: %v", err, err)
+		}
+		if apiErr.StatusCode != 404 {
+			t.Errorf("status: got %d", apiErr.StatusCode)
+		}
+	})
+}
+
+func TestCreateNewGameFallbackToDefaultLocale(t *testing.T) {
+	t.Run("includes fallbackToDefaultLocale in body when set to true", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var body map[string]interface{}
+			json.NewDecoder(r.Body).Decode(&body)
+			if body["fallbackToDefaultLocale"] != true {
+				t.Errorf("fallbackToDefaultLocale: got %v", body["fallbackToDefaultLocale"])
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(CreateNewGameResponse{GameURL: "https://game.url"})
+		}))
+		defer server.Close()
+
+		cfg := testConfig
+		cfg.BaseURL = server.URL
+		client, _ := NewClient(cfg)
+
+		fallback := true
+		_, err := client.CreateNewGame(context.Background(), CreateNewGameParams{
+			GameID:                  "sg_catch_97",
+			Demo:                    false,
+			Platform:                PlatformDesktop,
+			Currency:                "USD",
+			Locale:                  "xx_xx",
+			FallbackToDefaultLocale: &fallback,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("does not include fallbackToDefaultLocale when nil", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var body map[string]interface{}
+			json.NewDecoder(r.Body).Decode(&body)
+			if _, exists := body["fallbackToDefaultLocale"]; exists {
+				t.Errorf("expected fallbackToDefaultLocale to be absent, got %v", body["fallbackToDefaultLocale"])
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(CreateNewGameResponse{GameURL: "https://game.url"})
+		}))
+		defer server.Close()
+
+		cfg := testConfig
+		cfg.BaseURL = server.URL
+		client, _ := NewClient(cfg)
+
+		_, err := client.CreateNewGame(context.Background(), CreateNewGameParams{
+			GameID:   "sg_catch_97",
+			Demo:     false,
+			Platform: PlatformDesktop,
+			Currency: "USD",
+			Locale:   "en_us",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+}
+
 func TestCancelFreeRounds(t *testing.T) {
 	t.Run("sends signed DELETE to /free-rounds", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

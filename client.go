@@ -139,6 +139,30 @@ func (c *Client) CreateFreeRounds(ctx context.Context, params CreateFreeRoundsPa
 	return &result, nil
 }
 
+// GetFreeRoundsInfo retrieves the current state of a free rounds campaign.
+func (c *Client) GetFreeRoundsInfo(ctx context.Context, params GetFreeRoundsInfoParams) (*FreeRoundsInfoResponse, error) {
+	if params.ID == "" && params.ExtID == "" {
+		return nil, &ValidationError{Message: "One of id or extID must be provided"}
+	}
+
+	queryParams := map[string]string{
+		"cID":    c.cid,
+		"extCID": c.extCID,
+	}
+	if params.ID != "" {
+		queryParams["id"] = params.ID
+	}
+	if params.ExtID != "" {
+		queryParams["extID"] = params.ExtID
+	}
+
+	var result FreeRoundsInfoResponse
+	if err := c.doGet(ctx, "/free-rounds", queryParams, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 // CancelFreeRounds cancels an existing free rounds campaign.
 func (c *Client) CancelFreeRounds(ctx context.Context, params CancelFreeRoundsParams) error {
 	if params.ID == "" && params.ExtID == "" {
@@ -168,6 +192,9 @@ func (c *Client) buildCreateNewGameBody(params CreateNewGameParams) map[string]i
 		"platform": params.Platform,
 		"currency": params.Currency,
 		"locale":   params.Locale,
+	}
+	if params.FallbackToDefaultLocale != nil {
+		body["fallbackToDefaultLocale"] = *params.FallbackToDefaultLocale
 	}
 	if params.SessionID != "" {
 		body["sessionID"] = params.SessionID
