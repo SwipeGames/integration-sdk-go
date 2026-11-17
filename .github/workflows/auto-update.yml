@@ -17,6 +17,17 @@ on:
         type: boolean
         default: false
 
+# Model transport: Claude Code talks to the LiteLLM gateway's Anthropic-compatible /v1/messages
+# endpoint with a LiteLLM virtual key (LITELLM_CLAUDE_API_KEY), and LiteLLM forwards to Bedrock.
+# This repo is public, so it cannot use the in-cluster self-hosted runners (and the in-cluster
+# service URL). The GitHub-hosted runner reaches LiteLLM through the Cloudflare tunnel instead;
+# Cloudflare Access lets it in with the `github-actions-litellm` service token (ENG-2872).
+env:
+  # LiteLLM base URL WITHOUT /v1 (Claude Code appends /v1/messages itself).
+  LITELLM_BASE_URL: https://litellm.internal.swipegames.io
+  # The `model_name` in the gateway's model_list (→ bedrock/global.anthropic.claude-opus-4-8).
+  CLAUDE_MODEL: bedrock-claude-opus-4-8-reviewer
+
 jobs:
   update:
     runs-on: ubuntu-24.04
@@ -31,6 +42,42 @@ jobs:
       target_version: ${{ steps.versions.outputs.target }}
 
     steps:
+      - name: Verify gateway, key and model
+        # Fail in seconds instead of inside claude-code-action's retry loop: secrets not
+        # available, Cloudflare Access rejecting the service token, LiteLLM rejecting the
+        # virtual key, or the key not allowed the model.
+        env:
+          LITELLM_API_KEY: ${{ secrets.LITELLM_CLAUDE_API_KEY }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_LITELLM_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_LITELLM_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          for name in LITELLM_API_KEY CF_ACCESS_CLIENT_ID CF_ACCESS_CLIENT_SECRET; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Secret for ${name} is not available to this repository."
+              exit 1
+            fi
+          done
+          # Credentials via headers on stdin, never on the command line (visible in ps).
+          # Without a valid service token Cloudflare Access answers 302 (login page), which
+          # --fail-with-body does not treat as an error, so the jq check below catches it.
+          MODELS=$(printf 'Authorization: Bearer %s\nCF-Access-Client-Id: %s\nCF-Access-Client-Secret: %s\n' \
+              "$LITELLM_API_KEY" "$CF_ACCESS_CLIENT_ID" "$CF_ACCESS_CLIENT_SECRET" \
+            | curl -sS --fail-with-body --max-time 20 -H @- "${LITELLM_BASE_URL%/}/v1/models") || {
+            echo "::error::LiteLLM ${LITELLM_BASE_URL} unreachable or rejected the key: $MODELS"
+            exit 1
+          }
+          if ! jq -e '.data' <<<"$MODELS" >/dev/null 2>&1; then
+            echo "::error::No model list from ${LITELLM_BASE_URL} — Cloudflare Access likely rejected the service token."
+            exit 1
+          fi
+          if ! jq -e --arg m "$CLAUDE_MODEL" '.data[]? | select(.id == $m)' <<<"$MODELS" >/dev/null; then
+            echo "::error::Model '$CLAUDE_MODEL' is not available to this virtual key. Visible models:"
+            jq -r '.data[]?.id' <<<"$MODELS" || true
+            exit 1
+          fi
+          echo "Using LiteLLM at $LITELLM_BASE_URL with model $CLAUDE_MODEL"
+
       - name: Generate a token
         id: generate-token
         uses: getsentry/action-github-app-token@d4b5da6c5e37703f8c3b3e43abb5705b46e159cc
@@ -145,13 +192,28 @@ jobs:
       - name: Run Claude Code for SDK update
         if: steps.versions.outputs.up_to_date == 'false' && steps.check-branch.outputs.exists == 'false'
         id: claude
+        timeout-minutes: 30
         uses: anthropics/claude-code-action@v1
         env:
-          AWS_BEARER_TOKEN_BEDROCK: ${{ secrets.BEDROCK_API_KEY }}
-          AWS_REGION: ${{ secrets.BEDROCK_REGION }}
+          # Anthropic-compatible endpoint. The virtual key goes in as the anthropic_api_key
+          # input below; Claude Code sends it as x-api-key.
+          ANTHROPIC_BASE_URL: ${{ env.LITELLM_BASE_URL }}
+          # Cloudflare Access service token, sent on every request (one header per line).
+          ANTHROPIC_CUSTOM_HEADERS: |-
+            CF-Access-Client-Id: ${{ secrets.CF_ACCESS_LITELLM_CLIENT_ID }}
+            CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_LITELLM_CLIENT_SECRET }}
+          # Every model alias Claude Code can resolve must map to a name the gateway serves.
+          # Claude Code uses the haiku slot for background calls — unmapped, those request
+          # real Anthropic ids the gateway lacks.
+          ANTHROPIC_DEFAULT_OPUS_MODEL: ${{ env.CLAUDE_MODEL }}
+          ANTHROPIC_DEFAULT_SONNET_MODEL: ${{ env.CLAUDE_MODEL }}
+          ANTHROPIC_DEFAULT_HAIKU_MODEL: ${{ env.CLAUDE_MODEL }}
+          CLAUDE_CODE_SUBAGENT_MODEL: ${{ env.CLAUDE_MODEL }}
+          # The request still ends at Bedrock, which rejects the billing header Claude Code
+          # injects (anthropics/claude-code#24168).
           CLAUDE_CODE_ATTRIBUTION_HEADER: "0"
         with:
-          use_bedrock: "true"
+          anthropic_api_key: ${{ secrets.LITELLM_CLAUDE_API_KEY }}
           allowed_bots: "swipegames-example-app[bot]"
           prompt: |
             Read the prompt file at .github/prompts/auto-update.md and follow its instructions.
@@ -167,9 +229,7 @@ jobs:
             IMPORTANT: After making all changes, run `go test ./...` and `go vet ./...` to verify everything works. Fix any failures before finishing.
 
             IMPORTANT: As your FINAL step, write a concise markdown summary of the SDK changes you made to /tmp/sdk-changes-summary.md. This will be included in the PR description. Focus on what changed from the SDK user's perspective (new methods, new types, changed signatures, new validations, etc.). Use bullet points. Do NOT include internal implementation details.
-          direct_prompt: true
-          claude_args: '--model global.anthropic.claude-opus-4-6-v1 --max-turns 30 --allowedTools "Bash,Read,Write,Edit,MultiEdit,Glob,Grep"'
-          timeout_minutes: "30"
+          claude_args: '--model ${{ env.CLAUDE_MODEL }} --allowedTools "Bash,Read,Write,Edit,MultiEdit,Glob,Grep"'
 
       - name: Run final tests
         if: steps.versions.outputs.up_to_date == 'false' && steps.check-branch.outputs.exists == 'false'
